@@ -19,6 +19,9 @@ const DashboardScreen = ({ navigation }) => {
     totalDonations: 0,
     activeDonations: 0,
     completedDonations: 0,
+    reservedDonations: 0,
+    totalWeight: 0,
+    pendingConfirmations: 0,
   })
   const [recentDonations, setRecentDonations] = useState([])
   const [loading, setLoading] = useState(false)
@@ -26,13 +29,36 @@ const DashboardScreen = ({ navigation }) => {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      const [statsData, donationsData] = await Promise.all([
+      const [statsData, donationsData, allDonations] = await Promise.all([
         donationService.getStats(),
         donationService.getMyDonations(),
+        donationService.getDonations(),
       ])
 
-      setStats(statsData)
-      setRecentDonations(donationsData.slice(0, 3)) // Últimas 3 donaciones
+      let reserved = 0
+      let totalWeight = 0
+      let pendingConfirmations = 0
+
+      if (user?.userType === "donor") {
+        reserved = donationsData.filter((d) => d.status === "reserved").length
+        totalWeight = donationsData.reduce((sum, d) => sum + (Number.parseFloat(d.weight) || 0), 0)
+        pendingConfirmations = donationsData.filter((d) => d.status === "reserved" && !d.donor_confirmed_at).length
+      } else {
+        const myReservedDonations = allDonations.filter((d) => d.reserved_by === user?.id)
+        reserved = myReservedDonations.filter((d) => d.status === "reserved").length
+        totalWeight = myReservedDonations.reduce((sum, d) => sum + (Number.parseFloat(d.weight) || 0), 0)
+        pendingConfirmations = myReservedDonations.filter(
+          (d) => d.status === "reserved" && !d.recipient_confirmed_at,
+        ).length
+      }
+
+      setStats({
+        ...statsData,
+        reservedDonations: reserved,
+        totalWeight: totalWeight,
+        pendingConfirmations: pendingConfirmations,
+      })
+      setRecentDonations(donationsData.slice(0, 3))
     } catch (error) {
       Alert.alert("Error", "No se pudieron cargar los datos")
     } finally {
@@ -98,7 +124,6 @@ const DashboardScreen = ({ navigation }) => {
     }
   }
 
-  // FUNCIÓN MEJORADA PARA MOSTRAR DETALLES
   const showDonationDetails = (donation) => {
     console.log("🔍 [DASHBOARD] Datos de donación:", donation)
 
@@ -106,16 +131,12 @@ const DashboardScreen = ({ navigation }) => {
       if (!dateString) return "No especificada"
 
       try {
-        // Intentar diferentes formatos de fecha
         let date
         if (dateString.includes("T")) {
-          // Formato ISO: 2024-05-20T00:00:00.000Z
           date = new Date(dateString)
         } else if (dateString.includes("-")) {
-          // Formato YYYY-MM-DD
           date = new Date(dateString + "T00:00:00")
         } else {
-          // Otros formatos
           date = new Date(dateString)
         }
 
@@ -135,7 +156,6 @@ const DashboardScreen = ({ navigation }) => {
       }
     }
 
-    // Revisar todos los posibles campos de fecha
     const expiryDate = donation.expiry_date || donation.expiration_date || donation.expires_at || donation.expire_date
     console.log("📅 [DASHBOARD] Campo de fecha encontrado:", expiryDate)
 
@@ -164,152 +184,261 @@ const DashboardScreen = ({ navigation }) => {
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadDashboardData} />}
       >
-        {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>¡Hola!</Text>
-            <Text style={styles.userName}>{user?.name}</Text>
-          </View>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.greeting}>Bienvenido de nuevo</Text>
+              <Text style={styles.userName}>{user?.name}</Text>
+              <Text style={styles.userType}>
+                {user?.userType === "donor" ? "Comercio Donante" : "Organización Receptora"}
+              </Text>
+            </View>
 
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate("Notifications")}>
-              <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} />
-              {getUnreadCount() > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{getUnreadCount()}</Text>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate("Notifications")}>
+                <View style={styles.iconCircle}>
+                  <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+                  {getUnreadCount() > 0 && (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationBadgeText}>{getUnreadCount()}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={24} color={colors.error} />
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <View style={[styles.iconCircle, styles.logoutCircle]}>
+                  <Ionicons name="log-out-outline" size={22} color={colors.error} />
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <Card style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.totalDonations}</Text>
-            <Text style={styles.statLabel}>Total Donaciones</Text>
-          </Card>
+        <View style={styles.statsSection}>
+          <Text style={styles.statsSectionTitle}>Resumen General</Text>
 
-          <Card style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.activeDonations}</Text>
-            <Text style={styles.statLabel}>Activas</Text>
-          </Card>
+          <View style={styles.statsGrid}>
+            <Card style={[styles.statCard, styles.mainStatCard]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="gift" size={32} color={colors.white} />
+              </View>
+              <Text style={styles.mainStatNumber}>{stats.totalDonations}</Text>
+              <Text style={styles.mainStatLabel}>
+                {user?.userType === "donor" ? "Donaciones Creadas" : "Donaciones Totales"}
+              </Text>
+            </Card>
 
-          <Card style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.completedDonations}</Text>
-            <Text style={styles.statLabel}>Completadas</Text>
-          </Card>
-        </View>
+            <View style={styles.secondaryStatsContainer}>
+              <Card style={styles.secondaryStatCard}>
+                <View style={[styles.statBadge, { backgroundColor: colors.success + "20" }]}>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                </View>
+                <Text style={styles.secondaryStatNumber}>{stats.activeDonations}</Text>
+                <Text style={styles.secondaryStatLabel}>Activas</Text>
+              </Card>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+              <Card style={styles.secondaryStatCard}>
+                <View style={[styles.statBadge, { backgroundColor: colors.warning + "20" }]}>
+                  <Ionicons name="time" size={20} color={colors.warning} />
+                </View>
+                <Text style={styles.secondaryStatNumber}>{stats.reservedDonations}</Text>
+                <Text style={styles.secondaryStatLabel}>Reservadas</Text>
+              </Card>
 
-          {user?.userType === "donor" ? (
-            <Button
-              title="Nueva Donación"
-              onPress={() => navigation.navigate("CreateDonation")}
-              style={styles.actionButton}
-              icon="add-circle-outline"
-            />
-          ) : (
-            <Button
-              title="Ver Donaciones Disponibles"
-              onPress={() => navigation.navigate("Map")}
-              style={styles.actionButton}
-              icon="map-outline"
-            />
+              <Card style={styles.secondaryStatCard}>
+                <View style={[styles.statBadge, { backgroundColor: colors.info + "20" }]}>
+                  <Ionicons name="checkmark-done" size={20} color={colors.info} />
+                </View>
+                <Text style={styles.secondaryStatNumber}>{stats.completedDonations}</Text>
+                <Text style={styles.secondaryStatLabel}>Completadas</Text>
+              </Card>
+
+              <Card style={styles.secondaryStatCard}>
+                <View style={[styles.statBadge, { backgroundColor: colors.primary + "20" }]}>
+                  <Ionicons name="scale" size={20} color={colors.primary} />
+                </View>
+                <Text style={styles.secondaryStatNumber}>{stats.totalWeight.toFixed(1)} kg</Text>
+                <Text style={styles.secondaryStatLabel}>Peso Total</Text>
+              </Card>
+            </View>
+          </View>
+
+          {stats.pendingConfirmations > 0 && (
+            <Card style={styles.alertCard}>
+              <View style={styles.alertContent}>
+                <View style={styles.alertIcon}>
+                  <Ionicons name="alert-circle" size={24} color={colors.warning} />
+                </View>
+                <View style={styles.alertText}>
+                  <Text style={styles.alertTitle}>Confirmaciones Pendientes</Text>
+                  <Text style={styles.alertDescription}>
+                    Tienes {stats.pendingConfirmations} {stats.pendingConfirmations === 1 ? "donación" : "donaciones"}{" "}
+                    esperando tu confirmación
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => navigation.navigate("Donations")}>
+                  <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </Card>
           )}
         </View>
 
-        {/* Recent Donations */}
-        {user?.userType === "donor" && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Donaciones Recientes</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("Donations")}>
-                <Text style={styles.seeAllText}>Ver todas</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
 
-            {recentDonations.length > 0 ? (
-              recentDonations.map((donation) => (
-                <TouchableOpacity key={donation.id} onPress={() => showDonationDetails(donation)} activeOpacity={0.7}>
-                  <Card style={styles.donationCard}>
-                    <View style={styles.donationHeader}>
+          <View style={styles.quickActionsGrid}>
+            {user?.userType === "donor" ? (
+              <>
+                <TouchableOpacity
+                  style={styles.quickActionCard}
+                  onPress={() => navigation.navigate("CreateDonation")}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: colors.success + "20" }]}>
+                    <Ionicons name="add-circle" size={28} color={colors.success} />
+                  </View>
+                  <Text style={styles.quickActionTitle}>Nueva Donación</Text>
+                  <Text style={styles.quickActionDescription}>Crear una nueva publicación</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.quickActionCard}
+                  onPress={() => navigation.navigate("Donations")}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: colors.primary + "20" }]}>
+                    <Ionicons name="list" size={28} color={colors.primary} />
+                  </View>
+                  <Text style={styles.quickActionTitle}>Mis Donaciones</Text>
+                  <Text style={styles.quickActionDescription}>Ver todas mis publicaciones</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.quickActionCard}
+                  onPress={() => navigation.navigate("Map")}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: colors.primary + "20" }]}>
+                    <Ionicons name="map" size={28} color={colors.primary} />
+                  </View>
+                  <Text style={styles.quickActionTitle}>Ver Mapa</Text>
+                  <Text style={styles.quickActionDescription}>Buscar donaciones cercanas</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.quickActionCard}
+                  onPress={() => navigation.navigate("Donations")}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: colors.success + "20" }]}>
+                    <Ionicons name="gift" size={28} color={colors.success} />
+                  </View>
+                  <Text style={styles.quickActionTitle}>Mis Reservas</Text>
+                  <Text style={styles.quickActionDescription}>Ver donaciones reservadas</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {user?.userType === "donor" ? "Donaciones Recientes" : "Actividad Reciente"}
+            </Text>
+            <TouchableOpacity onPress={() => navigation.navigate("Donations")}>
+              <Text style={styles.seeAllText}>Ver todas →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recentDonations.length > 0 ? (
+            recentDonations.map((donation) => (
+              <TouchableOpacity key={donation.id} onPress={() => showDonationDetails(donation)} activeOpacity={0.7}>
+                <Card style={styles.donationCard}>
+                  <View style={styles.donationHeader}>
+                    <View style={styles.donationTitleContainer}>
                       <Text style={styles.donationTitle}>{donation.title}</Text>
-                      <Badge variant={getStatusBadgeVariant(donation.status)} size="small">
-                        {getStatusText(donation.status)}
-                      </Badge>
-                    </View>
-
-                    <Text style={styles.donationDescription} numberOfLines={2}>
-                      {donation.description}
-                    </Text>
-
-                    {/* Información de usuario */}
-                    <View style={styles.donationUsers}>
-                      {donation.donor_name && (
-                        <Text style={styles.donorText}>
-                          <Ionicons name="person" size={14} color={colors.success} /> {donation.donor_name}
-                        </Text>
-                      )}
-                      {donation.reserved_by && donation.status === "reserved" && (
-                        <Text style={styles.recipientText}>
-                          <Ionicons name="business" size={14} color={colors.warning} />
-                          {donation.reserved_by === user?.id ? ` Reservada por ${user?.name}` : " Reservada"}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.donationFooter}>
-                      <View style={styles.categoryContainer}>
+                      <View style={styles.donationMeta}>
                         <View style={[styles.categoryDot, { backgroundColor: getCategoryColor(donation.category) }]} />
                         <Text style={styles.categoryText}>{getCategoryLabel(donation.category)}</Text>
                       </View>
-
-                      <Text style={styles.quantityText}>Cantidad: {donation.quantity}</Text>
                     </View>
+                    <Badge variant={getStatusBadgeVariant(donation.status)} size="small">
+                      {getStatusText(donation.status)}
+                    </Badge>
+                  </View>
 
-                    {/* Indicador de que es clickeable */}
-                    <View style={styles.clickIndicator}>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                  <Text style={styles.donationDescription} numberOfLines={2}>
+                    {donation.description}
+                  </Text>
+
+                  <View style={styles.donationInfo}>
+                    <View style={styles.infoItem}>
+                      <Ionicons name="cube-outline" size={16} color={colors.textSecondary} />
+                      <Text style={styles.infoText}>{donation.quantity} unidades</Text>
                     </View>
-                  </Card>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Card style={styles.emptyCard}>
-                <Text style={styles.emptyText}>No tienes donaciones recientes</Text>
-                <Button
-                  title="Crear primera donación"
-                  onPress={() => navigation.navigate("CreateDonation")}
-                  variant="outline"
-                  size="small"
-                  style={styles.emptyButton}
-                />
-              </Card>
-            )}
-          </View>
-        )}
+                    {donation.weight && (
+                      <View style={styles.infoItem}>
+                        <Ionicons name="scale-outline" size={16} color={colors.textSecondary} />
+                        <Text style={styles.infoText}>{donation.weight} kg</Text>
+                      </View>
+                    )}
+                    {donation.expiry_date && (
+                      <View style={styles.infoItem}>
+                        <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                        <Text style={styles.infoText}>
+                          {new Date(donation.expiry_date).toLocaleDateString("es-ES", {
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
 
-        {/* Tips Section */}
+                  <View style={styles.clickIndicator}>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Card style={styles.emptyCard}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="file-tray-outline" size={48} color={colors.textSecondary} />
+              </View>
+              <Text style={styles.emptyText}>
+                {user?.userType === "donor" ? "No tienes donaciones recientes" : "No tienes actividad reciente"}
+              </Text>
+              <Button
+                title={user?.userType === "donor" ? "Crear primera donación" : "Buscar donaciones"}
+                onPress={() => navigation.navigate(user?.userType === "donor" ? "CreateDonation" : "Map")}
+                variant="outline"
+                size="small"
+                style={styles.emptyButton}
+              />
+            </Card>
+          )}
+        </View>
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Consejos</Text>
+          <Text style={styles.sectionTitle}>Consejos Útiles</Text>
           <Card style={styles.tipCard}>
-            <View style={styles.tipHeader}>
-              <Ionicons name="bulb-outline" size={24} color={colors.warning} />
-              <Text style={styles.tipTitle}>Tip del día</Text>
+            <View style={styles.tipIconContainer}>
+              <Ionicons name="bulb" size={24} color={colors.warning} />
             </View>
-            <Text style={styles.tipText}>
-              {user?.userType === "donor"
-                ? "Asegúrate de indicar la fecha de caducidad correcta para ayudar a las organizaciones a planificar mejor."
-                : "Revisa regularmente el mapa para encontrar nuevas donaciones cerca de tu ubicación."}
-            </Text>
+            <View style={styles.tipContent}>
+              <Text style={styles.tipTitle}>Tip del día</Text>
+              <Text style={styles.tipText}>
+                {user?.userType === "donor"
+                  ? "Asegúrate de indicar la fecha de caducidad correcta y el peso aproximado para ayudar a las organizaciones a planificar mejor la recogida."
+                  : "Revisa regularmente el mapa para encontrar nuevas donaciones cerca de tu ubicación. Confirma las reservas a tiempo para ayudar a los comercios."}
+              </Text>
+            </View>
           </Card>
         </View>
       </ScrollView>
@@ -320,79 +449,191 @@ const DashboardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.gray50,
   },
   scrollView: {
     flex: 1,
   },
   header: {
+    backgroundColor: colors.white,
+    paddingBottom: spacing.xl,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingTop: spacing.lg,
   },
   greeting: {
-    fontSize: typography.base,
+    fontSize: typography.sm,
     color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   userName: {
-    fontSize: typography.xl,
+    fontSize: typography["2xl"],
     fontWeight: typography.bold,
     color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  userType: {
+    fontSize: typography.sm,
+    color: colors.primary,
+    fontWeight: typography.medium,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  logoutCircle: {
+    backgroundColor: colors.error + "15",
   },
   notificationButton: {
     position: "relative",
-    padding: spacing.sm,
   },
   notificationBadge: {
     position: "absolute",
-    top: 0,
-    right: 0,
+    top: -2,
+    right: -2,
     backgroundColor: colors.error,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.white,
   },
   notificationBadgeText: {
     color: colors.white,
     fontSize: typography.xs,
     fontWeight: typography.bold,
   },
-  logoutButton: {
-    padding: spacing.sm,
-  },
-  statsContainer: {
-    flexDirection: "row",
+  logoutButton: {},
+  statsSection: {
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  statsSectionTitle: {
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+  },
+  statsGrid: {
     gap: spacing.md,
   },
-  statCard: {
-    flex: 1,
+  mainStatCard: {
+    backgroundColor: colors.primary,
+    padding: spacing.xl,
     alignItems: "center",
-    padding: spacing.lg,
+    borderRadius: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  statNumber: {
-    fontSize: typography["2xl"],
+  statIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+  },
+  mainStatNumber: {
+    fontSize: 48,
     fontWeight: typography.bold,
-    color: colors.primary,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
-  statLabel: {
+  mainStatLabel: {
+    fontSize: typography.base,
+    color: colors.white,
+    textAlign: "center",
+    opacity: 0.9,
+  },
+  secondaryStatsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  secondaryStatCard: {
+    flex: 1,
+    minWidth: "47%",
+    padding: spacing.lg,
+    alignItems: "center",
+    borderRadius: 12,
+  },
+  statBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.sm,
+  },
+  secondaryStatNumber: {
+    fontSize: typography.xl,
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  secondaryStatLabel: {
     fontSize: typography.sm,
     color: colors.textSecondary,
     textAlign: "center",
+  },
+  alertCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.warning + "10",
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+  },
+  alertContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  alertIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alertText: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: typography.base,
+    fontWeight: typography.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  alertDescription: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
   },
   section: {
     paddingHorizontal: spacing.xl,
@@ -406,21 +647,60 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: typography.lg,
-    fontWeight: typography.semibold,
+    fontWeight: typography.bold,
     color: colors.textPrimary,
     marginBottom: spacing.lg,
   },
   seeAllText: {
     fontSize: typography.sm,
     color: colors.primary,
-    fontWeight: typography.medium,
+    fontWeight: typography.semibold,
   },
-  actionButton: {
-    marginTop: spacing.md,
+  quickActionsGrid: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  quickActionCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+  },
+  quickActionTitle: {
+    fontSize: typography.base,
+    fontWeight: typography.semibold,
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginBottom: spacing.xs,
+  },
+  quickActionDescription: {
+    fontSize: typography.xs,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
   donationCard: {
     marginBottom: spacing.md,
     position: "relative",
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   donationHeader: {
     flexDirection: "row",
@@ -428,25 +708,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: spacing.sm,
   },
+  donationTitleContainer: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
   donationTitle: {
     fontSize: typography.base,
     fontWeight: typography.semibold,
     color: colors.textPrimary,
-    flex: 1,
-    marginRight: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  donationDescription: {
-    fontSize: typography.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-    lineHeight: typography.lineHeight.normal * typography.sm,
-  },
-  donationFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  categoryContainer: {
+  donationMeta: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -457,16 +729,43 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   categoryText: {
+    fontSize: typography.xs,
+    color: colors.textSecondary,
+  },
+  donationDescription: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    lineHeight: typography.lineHeight.normal * typography.sm,
+  },
+  donationInfo: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  infoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  infoText: {
     fontSize: typography.sm,
     color: colors.textSecondary,
   },
-  quantityText: {
-    fontSize: typography.sm,
-    color: colors.textSecondary,
+  clickIndicator: {
+    position: "absolute",
+    right: spacing.md,
+    top: "50%",
+    transform: [{ translateY: -9 }],
   },
   emptyCard: {
     alignItems: "center",
     paddingVertical: spacing["2xl"],
+    borderRadius: 12,
+  },
+  emptyIcon: {
+    marginBottom: spacing.lg,
+    opacity: 0.5,
   },
   emptyText: {
     fontSize: typography.base,
@@ -478,43 +777,35 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   tipCard: {
-    backgroundColor: colors.gray50,
+    flexDirection: "row",
+    backgroundColor: colors.warning + "10",
     borderLeftWidth: 4,
     borderLeftColor: colors.warning,
+    borderRadius: 12,
+    padding: spacing.lg,
   },
-  tipHeader: {
-    flexDirection: "row",
+  tipIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white,
     alignItems: "center",
-    marginBottom: spacing.sm,
+    justifyContent: "center",
+    marginRight: spacing.md,
+  },
+  tipContent: {
+    flex: 1,
   },
   tipTitle: {
     fontSize: typography.base,
     fontWeight: typography.semibold,
     color: colors.textPrimary,
-    marginLeft: spacing.sm,
+    marginBottom: spacing.sm,
   },
   tipText: {
     fontSize: typography.sm,
     color: colors.textSecondary,
     lineHeight: typography.lineHeight.relaxed * typography.sm,
-  },
-  donationUsers: {
-    marginBottom: spacing.sm,
-  },
-  donorText: {
-    fontSize: typography.xs,
-    color: colors.success,
-    marginBottom: spacing.xs,
-  },
-  recipientText: {
-    fontSize: typography.xs,
-    color: colors.warning,
-  },
-  clickIndicator: {
-    position: "absolute",
-    right: spacing.md,
-    top: "50%",
-    transform: [{ translateY: -8 }],
   },
 })
 

@@ -29,44 +29,93 @@ const CATEGORIES = [
   { id: "meat", label: "Carnes", icon: "🥩" },
   { id: "canned", label: "Enlatados", icon: "🥫" },
   { id: "prepared", label: "Comida Preparada", icon: "🍱" },
+  { id: "sugar", label: "Azúcares", icon: "🍬" },
+  { id: "fats", label: "Grasas", icon: "🧈" },
+  { id: "cereals", label: "Cereales", icon: "🌾" },
+  { id: "beverages", label: "Bebidas", icon: "🥤" },
   { id: "other", label: "Otros", icon: "📦" },
 ]
 
 const CreateDonationScreen = ({ navigation }) => {
   const mapWebViewRef = useRef(null)
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    category: "",
-    quantity: "",
-    expiryDate: "",
-  })
+
+  const [donationItems, setDonationItems] = useState([
+    {
+      id: Date.now(),
+      title: "",
+      description: "",
+      category: "",
+      quantity: "",
+      weight: "",
+      expiryDate: "",
+      donationReason: "",
+      contactInfo: "",
+    },
+  ])
+
   const [loading, setLoading] = useState(false)
   const [showMap, setShowMap] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [mapReady, setMapReady] = useState(false)
+  const [editingItemIndex, setEditingItemIndex] = useState(0)
 
-  const updateFormData = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const updateItemData = (index, field, value) => {
+    setDonationItems((prev) => {
+      const newItems = [...prev]
+      newItems[index] = { ...newItems[index], [field]: value }
+      return newItems
+    })
   }
 
-  // FUNCIÓN MEJORADA PARA VALIDAR Y FORMATEAR FECHA
+  const addDonationItem = () => {
+    const newItem = {
+      id: Date.now(),
+      title: "",
+      description: "",
+      category: "",
+      quantity: "",
+      weight: "",
+      expiryDate: "",
+      donationReason: "",
+      contactInfo: "",
+    }
+    setDonationItems((prev) => [...prev, newItem])
+    setEditingItemIndex(donationItems.length)
+  }
+
+  const removeDonationItem = (index) => {
+    if (donationItems.length === 1) {
+      Alert.alert("Error", "Debe haber al menos una donación")
+      return
+    }
+
+    Alert.alert("Eliminar donación", "¿Estás seguro de que quieres eliminar esta donación?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => {
+          setDonationItems((prev) => prev.filter((_, i) => i !== index))
+          if (editingItemIndex >= donationItems.length - 1) {
+            setEditingItemIndex(Math.max(0, donationItems.length - 2))
+          }
+        },
+      },
+    ])
+  }
+
   const validateAndFormatDate = (dateString) => {
     if (!dateString.trim()) return ""
 
-    // Remover espacios y caracteres especiales excepto números y guiones
     let cleanDate = dateString.replace(/[^\d-]/g, "")
 
-    // Si solo tiene números, intentar formatear automáticamente
     if (!/[-]/.test(cleanDate) && cleanDate.length >= 6) {
       if (cleanDate.length === 8) {
-        // DDMMYYYY -> YYYY-MM-DD
         const day = cleanDate.substring(0, 2)
         const month = cleanDate.substring(2, 4)
         const year = cleanDate.substring(4, 8)
         cleanDate = `${year}-${month}-${day}`
       } else if (cleanDate.length === 6) {
-        // DDMMYY -> 20YY-MM-DD
         const day = cleanDate.substring(0, 2)
         const month = cleanDate.substring(2, 4)
         const year = "20" + cleanDate.substring(4, 6)
@@ -74,31 +123,54 @@ const CreateDonationScreen = ({ navigation }) => {
       }
     }
 
-    // Validar formato YYYY-MM-DD
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/
     if (!dateRegex.test(cleanDate)) {
-      return dateString // Devolver original si no se puede formatear
+      return dateString
     }
 
-    // Validar que sea una fecha válida
     const date = new Date(cleanDate + "T00:00:00")
     if (isNaN(date.getTime())) {
-      return dateString // Devolver original si la fecha es inválida
+      return dateString
     }
 
-    // Validar que no sea una fecha pasada
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     if (date < today) {
-      return dateString // Devolver original si es fecha pasada
+      return dateString
     }
 
     return cleanDate
   }
 
-  const handleDateChange = (value) => {
-    const formattedDate = validateAndFormatDate(value)
-    updateFormData("expiryDate", formattedDate)
+  const handleDateChange = (index, value) => {
+    // Remove all non-numeric characters except hyphens
+    const cleanValue = value.replace(/[^\d-]/g, "")
+
+    // Remove any existing hyphens to rebuild the format
+    let numbersOnly = cleanValue.replace(/-/g, "")
+
+    // Limit to 8 digits maximum (YYYYMMDD)
+    numbersOnly = numbersOnly.substring(0, 8)
+
+    // Build the formatted string with automatic hyphens
+    let formatted = ""
+
+    if (numbersOnly.length > 0) {
+      // Add year (first 4 digits)
+      formatted = numbersOnly.substring(0, 4)
+
+      if (numbersOnly.length > 4) {
+        // Add hyphen and month (next 2 digits)
+        formatted += "-" + numbersOnly.substring(4, 6)
+
+        if (numbersOnly.length > 6) {
+          // Add hyphen and day (last 2 digits)
+          formatted += "-" + numbersOnly.substring(6, 8)
+        }
+      }
+    }
+
+    updateItemData(index, "expiryDate", formatted)
   }
 
   const handleMapMessage = (event) => {
@@ -110,7 +182,6 @@ const CreateDonationScreen = ({ navigation }) => {
         case "MAP_READY":
           console.log("🗺️ [CREATE_DONATION] Mapa listo")
           setMapReady(true)
-          // Obtener ubicación actual del usuario
           getCurrentLocationForMap()
           break
 
@@ -146,7 +217,6 @@ const CreateDonationScreen = ({ navigation }) => {
 
         console.log("📍 [CREATE_DONATION] Ubicación del usuario obtenida:", userLocation)
 
-        // Enviar ubicación al mapa
         if (mapWebViewRef.current) {
           mapWebViewRef.current.postMessage(
             JSON.stringify({
@@ -158,7 +228,6 @@ const CreateDonationScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error("❌ [CREATE_DONATION] Error obteniendo ubicación:", error)
-      // Usar ubicación por defecto (Pereira)
       const defaultLocation = {
         latitude: 4.8133,
         longitude: -75.6961,
@@ -181,46 +250,54 @@ const CreateDonationScreen = ({ navigation }) => {
     if (selectedLocation) {
       console.log("✅ [CREATE_DONATION] Ubicación confirmada:", selectedLocation)
       setShowMap(false)
-      setFormData((prev) => ({ ...prev, pickupAddress: selectedLocation.address }))
     }
   }
 
-  const handleSubmit = async () => {
-    const { title, description, category, quantity, expiryDate } = formData
-
-    if (!title || !description || !category || !quantity) {
-      Alert.alert("Error", "Por favor completa todos los campos obligatorios")
-      return
+  const validateItem = (item, index) => {
+    if (!item.title || !item.description || !item.category || !item.quantity) {
+      return `Donación ${index + 1}: Completa título, descripción, categoría y cantidad`
     }
 
-    if (isNaN(quantity) || Number.parseInt(quantity) <= 0) {
-      Alert.alert("Error", "La cantidad debe ser un número válido mayor a 0")
-      return
+    if (isNaN(item.quantity) || Number.parseInt(item.quantity) <= 0) {
+      return `Donación ${index + 1}: La cantidad debe ser un número válido mayor a 0`
     }
 
-    if (!selectedLocation) {
-      Alert.alert("Error", "Por favor selecciona una ubicación en el mapa")
-      return
+    if (item.weight && (isNaN(item.weight) || Number.parseFloat(item.weight) <= 0)) {
+      return `Donación ${index + 1}: El peso debe ser un número válido mayor a 0`
     }
 
-    // VALIDACIÓN MEJORADA DE FECHA
-    if (expiryDate) {
+    if (item.expiryDate) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-      if (!dateRegex.test(expiryDate)) {
-        Alert.alert("Error", "La fecha debe tener el formato YYYY-MM-DD (ej: 2024-12-25)")
-        return
+      if (!dateRegex.test(item.expiryDate)) {
+        return `Donación ${index + 1}: La fecha debe tener el formato YYYY-MM-DD`
       }
 
-      const date = new Date(expiryDate + "T00:00:00")
+      const date = new Date(item.expiryDate + "T00:00:00")
       if (isNaN(date.getTime())) {
-        Alert.alert("Error", "La fecha de caducidad no es válida")
-        return
+        return `Donación ${index + 1}: La fecha de caducidad no es válida`
       }
 
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       if (date < today) {
-        Alert.alert("Error", "La fecha de caducidad no puede ser anterior a hoy")
+        return `Donación ${index + 1}: La fecha de caducidad no puede ser anterior a hoy`
+      }
+    }
+
+    return null
+  }
+
+  const handleSubmit = async () => {
+    if (!selectedLocation) {
+      Alert.alert("Error", "Por favor selecciona una ubicación en el mapa")
+      return
+    }
+
+    for (let i = 0; i < donationItems.length; i++) {
+      const error = validateItem(donationItems[i], i)
+      if (error) {
+        Alert.alert("Error", error)
+        setEditingItemIndex(i)
         return
       }
     }
@@ -228,47 +305,46 @@ const CreateDonationScreen = ({ navigation }) => {
     try {
       setLoading(true)
 
-      // Preparar datos de la donación con coordenadas
-      const donationData = {
-        title,
-        description,
-        category,
-        quantity: Number.parseInt(quantity),
-        // Coordenadas principales
+      const donations = donationItems.map((item) => ({
+        title: item.title,
+        description: item.description,
+        category: item.category,
+        quantity: Number.parseInt(item.quantity),
+        weight: item.weight ? Number.parseFloat(item.weight) : null,
+        donation_reason: item.donationReason || null,
+        contact_info: item.contactInfo || null,
+        expiry_date: item.expiryDate || null,
         latitude: selectedLocation.latitude,
         longitude: selectedLocation.longitude,
-        // Coordenadas específicas de pickup (para compatibilidad)
         pickup_latitude: selectedLocation.latitude,
         pickup_longitude: selectedLocation.longitude,
         pickup_address: selectedLocation.address,
-      }
+      }))
 
-      // Añadir fecha de caducidad si existe (formato correcto)
-      if (expiryDate) {
-        donationData.expiry_date = expiryDate
-      }
+      console.log("📤 [CREATE_DONATION] Enviando donaciones:", donations)
 
-      console.log("📤 [CREATE_DONATION] Enviando datos de donación:", donationData)
+      const result = await donationService.createBatchDonations(donations)
 
-      const result = await donationService.createDonation(donationData)
+      console.log("✅ [CREATE_DONATION] Donaciones creadas exitosamente:", result)
 
-      console.log("✅ [CREATE_DONATION] Donación creada exitosamente:", result)
-
-      Alert.alert("Éxito", "Donación creada exitosamente", [
-        {
-          text: "OK",
-          onPress: () => navigation.goBack(),
-        },
-      ])
+      Alert.alert(
+        "Éxito",
+        `${donations.length} donación${donations.length > 1 ? "es" : ""} creada${donations.length > 1 ? "s" : ""} exitosamente`,
+        [
+          {
+            text: "OK",
+            onPress: () => navigation.goBack(),
+          },
+        ],
+      )
     } catch (error) {
-      console.error("❌ [CREATE_DONATION] Error creando donación:", error)
+      console.error("❌ [CREATE_DONATION] Error creando donaciones:", error)
       Alert.alert("Error", error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  // HTML del mapa para seleccionar ubicación
   const locationMapHTML = `
     <!DOCTYPE html>
     <html>
@@ -328,10 +404,8 @@ const CreateDonationScreen = ({ navigation }) => {
             
             logToRN('🚀 Iniciando mapa de selección de ubicación...');
             
-            // Inicializar mapa
             const map = L.map('map').setView([4.8133, -75.6961], 13);
             
-            // Añadir tiles de CartoDB
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
                 subdomains: 'abcd',
@@ -342,7 +416,6 @@ const CreateDonationScreen = ({ navigation }) => {
             let selectedMarker = null;
             let selectedLocation = null;
             
-            // Función para crear marcador de usuario
             function setUserLocation(location) {
                 logToRN(\`📍 Estableciendo ubicación de usuario: \${JSON.stringify(location)}\`);
                 
@@ -364,10 +437,8 @@ const CreateDonationScreen = ({ navigation }) => {
                 logToRN('✅ Ubicación de usuario establecida');
             }
             
-            // Función para obtener dirección aproximada
             async function getAddressFromCoords(lat, lng) {
                 try {
-                    // Usar Nominatim para geocodificación inversa
                     const response = await fetch(\`https://nominatim.openstreetmap.org/reverse?format=json&lat=\${lat}&lon=\${lng}&zoom=18&addressdetails=1\`);
                     const data = await response.json();
                     
@@ -382,19 +453,16 @@ const CreateDonationScreen = ({ navigation }) => {
                 }
             }
             
-            // Manejar click en el mapa
             map.on('click', async function(e) {
                 const lat = parseFloat(e.latlng.lat.toFixed(6));
                 const lng = parseFloat(e.latlng.lng.toFixed(6));
                 
                 logToRN(\`🎯 Click en mapa: \${lat}, \${lng}\`);
                 
-                // Remover marcador anterior
                 if (selectedMarker) {
                     map.removeLayer(selectedMarker);
                 }
                 
-                // Añadir nuevo marcador
                 selectedMarker = L.marker([lat, lng], {
                     icon: L.divIcon({
                         html: '<div class="location-marker"></div>',
@@ -404,7 +472,6 @@ const CreateDonationScreen = ({ navigation }) => {
                     })
                 }).addTo(map);
                 
-                // Obtener dirección
                 const address = await getAddressFromCoords(lat, lng);
                 
                 selectedMarker.bindPopup(\`
@@ -423,7 +490,6 @@ const CreateDonationScreen = ({ navigation }) => {
                 
                 logToRN(\`✅ Ubicación seleccionada: \${JSON.stringify(selectedLocation)}\`);
                 
-                // Enviar ubicación seleccionada a React Native
                 try {
                     window.ReactNativeWebView.postMessage(JSON.stringify({
                         type: 'LOCATION_SELECTED',
@@ -435,7 +501,6 @@ const CreateDonationScreen = ({ navigation }) => {
                 }
             });
             
-            // Escuchar mensajes de React Native
             document.addEventListener('message', handleMessage);
             window.addEventListener('message', handleMessage);
             
@@ -456,7 +521,6 @@ const CreateDonationScreen = ({ navigation }) => {
                 }
             }
             
-            // Notificar que el mapa está listo
             map.whenReady(function() {
                 logToRN('✅ Mapa de selección listo');
                 try {
@@ -475,76 +539,19 @@ const CreateDonationScreen = ({ navigation }) => {
     </html>
   `
 
+  const currentItem = donationItems[editingItemIndex]
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
         <ScrollView style={styles.scrollView}>
           <View style={styles.content}>
-            <Text style={styles.title}>Nueva Donación</Text>
-            <Text style={styles.subtitle}>Completa la información de tu donación</Text>
-
-            <Input
-              label="Título de la donación"
-              value={formData.title}
-              onChangeText={(value) => updateFormData("title", value)}
-              placeholder="Ej: Pan fresco del día"
-              required
-            />
-
-            <Input
-              label="Descripción"
-              value={formData.description}
-              onChangeText={(value) => updateFormData("description", value)}
-              placeholder="Describe los alimentos que donas"
-              multiline
-              numberOfLines={3}
-              required
-            />
-
-            <View style={styles.categorySection}>
-              <Text style={styles.categoryLabel}>Categoría *</Text>
-              <View style={styles.categoryGrid}>
-                {CATEGORIES.map((category) => (
-                  <Card
-                    key={category.id}
-                    style={[styles.categoryCard, formData.category === category.id && styles.categoryCardSelected]}
-                    onPress={() => updateFormData("category", category.id)}
-                  >
-                    <Text style={styles.categoryIcon}>{category.icon}</Text>
-                    <Text
-                      style={[styles.categoryText, formData.category === category.id && styles.categoryTextSelected]}
-                    >
-                      {category.label}
-                    </Text>
-                  </Card>
-                ))}
-              </View>
-            </View>
-
-            <Input
-              label="Cantidad"
-              value={formData.quantity}
-              onChangeText={(value) => updateFormData("quantity", value)}
-              placeholder="Número de unidades o porciones"
-              keyboardType="numeric"
-              required
-            />
-
-            <View style={styles.dateSection}>
-              <Input
-                label="Fecha de caducidad (opcional)"
-                value={formData.expiryDate}
-                onChangeText={handleDateChange}
-                placeholder="YYYY-MM-DD (ej: 2024-12-25)"
-                keyboardType="numeric"
-              />
-              <Text style={styles.dateHint}>
-                💡 Formato: YYYY-MM-DD. También puedes escribir DDMMYYYY y se convertirá automáticamente
-              </Text>
-            </View>
+            <Text style={styles.title}>Nueva Publicación</Text>
+            <Text style={styles.subtitle}>Crea una o varias donaciones para la misma ubicación</Text>
 
             <View style={styles.locationSection}>
-              <Text style={styles.locationLabel}>Ubicación de recogida *</Text>
+              <Text style={styles.locationLabel}>📍 Ubicación de recogida *</Text>
+              <Text style={styles.locationHint}>Todas las donaciones compartirán esta ubicación</Text>
               {selectedLocation ? (
                 <View style={styles.selectedLocationContainer}>
                   <View style={styles.locationInfo}>
@@ -570,12 +577,161 @@ const CreateDonationScreen = ({ navigation }) => {
               )}
             </View>
 
-            <Button title="Crear Donación" onPress={handleSubmit} loading={loading} style={styles.submitButton} />
+            <View style={styles.itemsTabsContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.itemsTabs}>
+                {donationItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.itemTab, editingItemIndex === index && styles.itemTabActive]}
+                    onPress={() => setEditingItemIndex(index)}
+                  >
+                    <Text style={[styles.itemTabText, editingItemIndex === index && styles.itemTabTextActive]}>
+                      {item.title || `Donación ${index + 1}`}
+                    </Text>
+                    {donationItems.length > 1 && (
+                      <TouchableOpacity style={styles.itemTabDelete} onPress={() => removeDonationItem(index)}>
+                        <Ionicons
+                          name="close-circle"
+                          size={18}
+                          color={editingItemIndex === index ? colors.primary : colors.textSecondary}
+                        />
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={styles.addItemTab} onPress={addDonationItem}>
+                  <Ionicons name="add-circle" size={24} color={colors.primary} />
+                  <Text style={styles.addItemText}>Agregar</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+
+            <View style={styles.itemForm}>
+              <Text style={styles.itemFormTitle}>
+                Donación {editingItemIndex + 1} de {donationItems.length}
+              </Text>
+
+              <Input
+                label="Título de la donación"
+                value={currentItem.title}
+                onChangeText={(value) => updateItemData(editingItemIndex, "title", value)}
+                placeholder="Ej: Pan fresco del día"
+                required
+              />
+
+              <Input
+                label="Descripción"
+                value={currentItem.description}
+                onChangeText={(value) => updateItemData(editingItemIndex, "description", value)}
+                placeholder="Describe los alimentos que donas"
+                multiline
+                numberOfLines={3}
+                required
+              />
+
+              <View style={styles.categorySection}>
+                <Text style={styles.categoryLabel}>Categoría *</Text>
+                <View style={styles.categoryGrid}>
+                  {CATEGORIES.map((category) => (
+                    <Card
+                      key={category.id}
+                      style={[styles.categoryCard, currentItem.category === category.id && styles.categoryCardSelected]}
+                      onPress={() => updateItemData(editingItemIndex, "category", category.id)}
+                    >
+                      <Text style={styles.categoryIcon}>{category.icon}</Text>
+                      <Text
+                        style={[
+                          styles.categoryText,
+                          currentItem.category === category.id && styles.categoryTextSelected,
+                        ]}
+                      >
+                        {category.label}
+                      </Text>
+                    </Card>
+                  ))}
+                </View>
+              </View>
+
+              <Input
+                label="Cantidad"
+                value={currentItem.quantity}
+                onChangeText={(value) => updateItemData(editingItemIndex, "quantity", value)}
+                placeholder="Número de unidades o porciones"
+                keyboardType="numeric"
+                required
+              />
+
+              <Input
+                label="Peso (kg - opcional)"
+                value={currentItem.weight}
+                onChangeText={(value) => updateItemData(editingItemIndex, "weight", value)}
+                placeholder="Ej: 2.5"
+                keyboardType="decimal-pad"
+              />
+
+              <Input
+                label="Motivo de la donación (opcional)"
+                value={currentItem.donationReason}
+                onChangeText={(value) => updateItemData(editingItemIndex, "donationReason", value)}
+                placeholder="Ej: Excedente de producción, cerca de caducar..."
+                multiline
+                numberOfLines={2}
+              />
+
+              <Input
+                label="Contacto (opcional)"
+                value={currentItem.contactInfo}
+                onChangeText={(value) => updateItemData(editingItemIndex, "contactInfo", value)}
+                placeholder="Teléfono o email de contacto"
+                keyboardType="default"
+              />
+
+              <View style={styles.dateSection}>
+                <Input
+                  label="Fecha de caducidad (opcional)"
+                  value={currentItem.expiryDate}
+                  onChangeText={(value) => handleDateChange(editingItemIndex, value)}
+                  placeholder="YYYY-MM-DD (ej: 2024-12-25)"
+                  keyboardType="numeric"
+                />
+                <Text style={styles.dateHint}>
+                  💡 Formato: YYYY-MM-DD. También puedes escribir DDMMYYYY y se convertirá automáticamente
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryTitle}>Resumen de donaciones</Text>
+              {donationItems.map((item, index) => (
+                <View key={item.id} style={styles.summaryItem}>
+                  <View style={styles.summaryItemHeader}>
+                    <Text style={styles.summaryItemNumber}>{index + 1}</Text>
+                    <Text style={styles.summaryItemTitle}>{item.title || "Sin título"}</Text>
+                    {item.category && (
+                      <Text style={styles.summaryItemCategory}>
+                        {CATEGORIES.find((c) => c.id === item.category)?.icon}
+                      </Text>
+                    )}
+                  </View>
+                  {item.quantity && (
+                    <Text style={styles.summaryItemDetail}>
+                      Cantidad: {item.quantity} {item.weight ? `(${item.weight} kg)` : ""}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            <Button
+              title={`Publicar ${donationItems.length} donación${donationItems.length > 1 ? "es" : ""}`}
+              onPress={handleSubmit}
+              loading={loading}
+              style={styles.submitButton}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modal del mapa */}
       {showMap && (
         <Modal visible={showMap} animationType="slide" presentationStyle="fullScreen">
           <SafeAreaView style={styles.mapModal}>
@@ -644,6 +800,141 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing["2xl"],
   },
+  locationSection: {
+    marginBottom: spacing["2xl"],
+    padding: spacing.lg,
+    backgroundColor: colors.primaryLight + "10",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.primary + "30",
+  },
+  locationLabel: {
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  locationHint: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    fontStyle: "italic",
+  },
+  selectLocationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    gap: spacing.md,
+  },
+  selectLocationText: {
+    fontSize: typography.base,
+    color: colors.primary,
+    fontWeight: typography.medium,
+  },
+  selectedLocationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+  },
+  locationInfo: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  locationText: {
+    flex: 1,
+  },
+  locationCoords: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    fontFamily: "monospace",
+  },
+  locationAddress: {
+    fontSize: typography.base,
+    color: colors.textPrimary,
+    marginTop: spacing.xs,
+  },
+  changeLocationButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+  },
+  changeLocationText: {
+    fontSize: typography.sm,
+    color: colors.white,
+    fontWeight: typography.medium,
+  },
+  itemsTabsContainer: {
+    marginBottom: spacing.xl,
+  },
+  itemsTabs: {
+    flexDirection: "row",
+  },
+  itemTab: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginRight: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  itemTabActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight + "20",
+  },
+  itemTabText: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    fontWeight: typography.medium,
+    maxWidth: 120,
+  },
+  itemTabTextActive: {
+    color: colors.primary,
+  },
+  itemTabDelete: {
+    marginLeft: spacing.xs,
+  },
+  addItemTab: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.primaryLight + "10",
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderStyle: "dashed",
+    gap: spacing.sm,
+  },
+  addItemText: {
+    fontSize: typography.sm,
+    color: colors.primary,
+    fontWeight: typography.medium,
+  },
+  itemForm: {
+    marginBottom: spacing.xl,
+  },
+  itemFormTitle: {
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+  },
   categorySection: {
     marginBottom: spacing.lg,
   },
@@ -692,74 +983,62 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontStyle: "italic",
   },
-  locationSection: {
-    marginBottom: spacing.lg,
+  summarySection: {
+    marginBottom: spacing.xl,
+    padding: spacing.lg,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  locationLabel: {
-    fontSize: typography.base,
-    fontWeight: typography.medium,
+  summaryTitle: {
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
-  selectLocationButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderRadius: 8,
-    backgroundColor: colors.primaryLight + "10",
-    gap: spacing.md,
-  },
-  selectLocationText: {
-    fontSize: typography.base,
-    color: colors.primary,
-    fontWeight: typography.medium,
-  },
-  selectedLocationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  summaryItem: {
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.background,
     borderRadius: 8,
-    backgroundColor: colors.white,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
   },
-  locationInfo: {
-    flex: 1,
+  summaryItemHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    marginBottom: spacing.xs,
+    gap: spacing.sm,
   },
-  locationText: {
+  summaryItemNumber: {
+    fontSize: typography.sm,
+    fontWeight: typography.bold,
+    color: colors.white,
+    backgroundColor: colors.primary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  summaryItemTitle: {
     flex: 1,
+    fontSize: typography.base,
+    fontWeight: typography.medium,
+    color: colors.textPrimary,
   },
-  locationCoords: {
+  summaryItemCategory: {
+    fontSize: 20,
+  },
+  summaryItemDetail: {
     fontSize: typography.sm,
     color: colors.textSecondary,
-    fontFamily: "monospace",
-  },
-  locationAddress: {
-    fontSize: typography.base,
-    color: colors.textPrimary,
-    marginTop: spacing.xs,
-  },
-  changeLocationButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: 6,
-  },
-  changeLocationText: {
-    fontSize: typography.sm,
-    color: colors.white,
-    fontWeight: typography.medium,
+    marginLeft: 32,
   },
   submitButton: {
     marginTop: spacing.xl,
   },
-  // Estilos del modal del mapa
   mapModal: {
     flex: 1,
     backgroundColor: colors.white,

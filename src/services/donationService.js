@@ -270,17 +270,30 @@ class DonationService {
     }
   }
 
-  async reserveDonation(donationId) {
+  async reserveDonation(donationId, pickupDetails) {
     try {
-      console.log("🔄 [DONATION_SERVICE] Reservando donación:", donationId)
+      console.log("🔄 [DONATION_SERVICE] Reservando donación:", {
+        donationId,
+        pickupDetails,
+      })
 
       if (!authService.isAuthenticated()) {
         throw new Error("Usuario no autenticado")
       }
 
+      if (
+        !pickupDetails ||
+        !pickupDetails.pickup_time ||
+        !pickupDetails.pickup_person_name ||
+        !pickupDetails.pickup_person_id
+      ) {
+        throw new Error("Debe proporcionar todos los detalles de recogida")
+      }
+
       const response = await fetch(`${API_BASE_URL}/donations/${donationId}/reserve`, {
         method: "POST",
         headers: authService.getAuthHeaders(),
+        body: JSON.stringify(pickupDetails),
       })
 
       console.log("📡 [DONATION_SERVICE] Reserve response status:", response.status)
@@ -300,18 +313,59 @@ class DonationService {
     }
   }
 
-  // NUEVA FUNCIÓN SIMPLE PARA CONFIRMAR
-  async confirmDonation(donationId) {
+  async businessConfirmPickup(donationId, accept) {
     try {
-      console.log("🔄 [DONATION_SERVICE] Confirmando donación:", donationId)
+      console.log("🔄 [DONATION_SERVICE] Confirmación de comercio:", {
+        donationId,
+        accept,
+      })
 
       if (!authService.isAuthenticated()) {
         throw new Error("Usuario no autenticado")
       }
 
+      const response = await fetch(`${API_BASE_URL}/donations/${donationId}/business-confirm`, {
+        method: "POST",
+        headers: authService.getAuthHeaders(),
+        body: JSON.stringify({ accept }),
+      })
+
+      console.log("📡 [DONATION_SERVICE] Business confirm response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error("❌ [DONATION_SERVICE] Business confirm error:", errorData)
+        throw new Error(errorData.error || `Error ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log("✅ [DONATION_SERVICE] Confirmación de comercio exitosa:", result)
+      return result
+    } catch (error) {
+      console.error("❌ [DONATION_SERVICE] Error in business confirmation:", error)
+      throw error
+    }
+  }
+
+  async confirmDonation(donationId, verificationCode) {
+    try {
+      console.log("🔄 [DONATION_SERVICE] Confirmando donación:", {
+        donationId,
+        verificationCode,
+      })
+
+      if (!authService.isAuthenticated()) {
+        throw new Error("Usuario no autenticado")
+      }
+
+      if (!verificationCode) {
+        throw new Error("Código de verificación requerido")
+      }
+
       const response = await fetch(`${API_BASE_URL}/donations/${donationId}/confirm`, {
         method: "POST",
         headers: authService.getAuthHeaders(),
+        body: JSON.stringify({ verification_code: verificationCode }),
       })
 
       console.log("📡 [DONATION_SERVICE] Confirm response status:", response.status)
@@ -402,6 +456,59 @@ class DonationService {
         completedDonations: 0,
         impactScore: 0,
       }
+    }
+  }
+
+  async createBatchDonations(donationsArray) {
+    try {
+      console.log("🔄 [DONATION_SERVICE] Creando donaciones en lote:", donationsArray)
+
+      if (!authService.isAuthenticated()) {
+        throw new Error("Usuario no autenticado")
+      }
+
+      if (!Array.isArray(donationsArray) || donationsArray.length === 0) {
+        throw new Error("Debe proporcionar al menos una donación")
+      }
+
+      // Validate all donations have coordinates
+      for (const donation of donationsArray) {
+        if (!donation.latitude || !donation.longitude) {
+          throw new Error("Todas las donaciones deben tener coordenadas de ubicación")
+        }
+      }
+
+      // Process all donations to ensure coordinates are numbers
+      const processedDonations = donationsArray.map((donation) => ({
+        ...donation,
+        latitude: Number.parseFloat(donation.latitude),
+        longitude: Number.parseFloat(donation.longitude),
+        pickup_latitude: Number.parseFloat(donation.pickup_latitude || donation.latitude),
+        pickup_longitude: Number.parseFloat(donation.pickup_longitude || donation.longitude),
+      }))
+
+      console.log("📤 [DONATION_SERVICE] Datos procesados para envío:", processedDonations)
+
+      const response = await fetch(`${API_BASE_URL}/donations/batch`, {
+        method: "POST",
+        headers: authService.getAuthHeaders(),
+        body: JSON.stringify({ donations: processedDonations }),
+      })
+
+      console.log("📡 [DONATION_SERVICE] Batch create response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error("❌ [DONATION_SERVICE] Batch create error:", errorData)
+        throw new Error(errorData.error || `Error ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log("✅ [DONATION_SERVICE] Donaciones creadas en lote:", result)
+      return result
+    } catch (error) {
+      console.error("❌ [DONATION_SERVICE] Error creating batch donations:", error)
+      throw error
     }
   }
 }

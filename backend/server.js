@@ -49,16 +49,13 @@ const cleanDonation = (donation) => {
     return null
   }
 
-  // Validar campos obligatorios
   if (!donation.id || !donation.title || !donation.category) {
     return null
   }
 
-  // Limpiar y convertir coordenadas
   let lat = Number.parseFloat(donation.pickup_latitude)
   let lng = Number.parseFloat(donation.pickup_longitude)
 
-  // Si las coordenadas son inválidas, usar coordenadas de Pereira
   if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
     lat = 4.8133 + (Math.random() - 0.5) * 0.02
     lng = -75.6961 + (Math.random() - 0.5) * 0.02
@@ -70,12 +67,15 @@ const cleanDonation = (donation) => {
     description: String(donation.description || "").trim(),
     category: String(donation.category).toLowerCase().trim(),
     quantity: Number.parseInt(donation.quantity) || 1,
+    weight: donation.weight ? Number.parseFloat(donation.weight) : null,
+    donation_reason: donation.donation_reason ? String(donation.donation_reason).trim() : null,
+    contact_info: donation.contact_info ? String(donation.contact_info).trim() : null,
     expiry_date: donation.expiry_date || null,
     pickup_address: String(donation.pickup_address || "").trim(),
     pickup_latitude: Number.parseFloat(lat.toFixed(6)),
     pickup_longitude: Number.parseFloat(lng.toFixed(6)),
-    latitude: Number.parseFloat(lat.toFixed(6)), // Alias para compatibilidad
-    longitude: Number.parseFloat(lng.toFixed(6)), // Alias para compatibilidad
+    latitude: Number.parseFloat(lat.toFixed(6)),
+    longitude: Number.parseFloat(lng.toFixed(6)),
     status: String(donation.status || "available").toLowerCase(),
     donor_id: Number.parseInt(donation.donor_id) || null,
     donor_name: String(donation.donor_name || "Donante anónimo").trim(),
@@ -90,6 +90,12 @@ const cleanDonation = (donation) => {
     recipient_confirmed: Boolean(donation.recipient_confirmed || false),
     donor_confirmed_at: donation.donor_confirmed_at || null,
     recipient_confirmed_at: donation.recipient_confirmed_at || null,
+    pickup_time: donation.pickup_time ? String(donation.pickup_time).trim() : null,
+    pickup_person_name: donation.pickup_person_name ? String(donation.pickup_person_name).trim() : null,
+    pickup_person_id: donation.pickup_person_id ? String(donation.pickup_person_id).trim() : null,
+    verification_code: donation.verification_code ? String(donation.verification_code).trim() : null,
+    business_confirmed: donation.business_confirmed !== null ? Boolean(donation.business_confirmed) : null,
+    business_confirmed_at: donation.business_confirmed_at || null,
   }
 }
 
@@ -147,23 +153,19 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(400).json({ error: "Todos los campos requeridos deben ser completados" })
     }
 
-    // Verificar si el usuario ya existe
     const [existingUsers] = await pool.execute("SELECT id FROM users WHERE email = ?", [email])
 
     if (existingUsers && existingUsers.length > 0) {
       return res.status(400).json({ error: "El usuario ya existe" })
     }
 
-    // Hashear contraseña
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Crear usuario
     const [result] = await pool.execute(
       "INSERT INTO users (email, password, name, phone, user_type, address) VALUES (?, ?, ?, ?, ?, ?)",
       [email, hashedPassword, name, phone, userType, address || ""],
     )
 
-    // Generar token
     const token = jwt.sign({ id: result.insertId, email, userType }, process.env.JWT_SECRET || "secret_key", {
       expiresIn: "24h",
     })
@@ -184,7 +186,6 @@ app.post("/api/auth/register", async (req, res) => {
   }
 })
 
-// Ruta para actualizar perfil de usuario
 app.put("/api/users/profile", authenticateToken, async (req, res) => {
   try {
     const { name, email, phone, address } = req.body
@@ -201,14 +202,12 @@ app.put("/api/users/profile", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Nombre y email son obligatorios" })
     }
 
-    // Verificar si el email ya existe para otro usuario
     const [existingUsers] = await pool.execute("SELECT id FROM users WHERE email = ? AND id != ?", [email, req.user.id])
 
     if (existingUsers && existingUsers.length > 0) {
       return res.status(400).json({ error: "Este email ya está en uso por otro usuario" })
     }
 
-    // Actualizar usuario
     const [result] = await pool.execute(
       `UPDATE users SET 
         name = ?, 
@@ -223,7 +222,6 @@ app.put("/api/users/profile", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "Usuario no encontrado" })
     }
 
-    // Obtener datos actualizados
     const [updatedUser] = await pool.execute(
       "SELECT id, email, name, phone, address, user_type FROM users WHERE id = ?",
       [req.user.id],
@@ -253,6 +251,9 @@ app.get("/api/donations", authenticateToken, async (req, res) => {
         d.description,
         d.category,
         d.quantity,
+        d.weight,
+        d.donation_reason,
+        d.contact_info,
         d.expiry_date,
         d.pickup_address,
         d.pickup_latitude,
@@ -268,6 +269,12 @@ app.get("/api/donations", authenticateToken, async (req, res) => {
         COALESCE(d.recipient_confirmed, FALSE) as recipient_confirmed,
         d.donor_confirmed_at,
         d.recipient_confirmed_at,
+        d.pickup_time,
+        d.pickup_person_name,
+        d.pickup_person_id,
+        d.verification_code,
+        d.business_confirmed,
+        d.business_confirmed_at,
         u.name as donor_name,
         u.phone as donor_phone,
         u.email as donor_email
@@ -309,7 +316,6 @@ app.get("/api/donations", authenticateToken, async (req, res) => {
       return res.json([])
     }
 
-    // Limpiar y validar cada donación
     const cleanDonations = rows.map(cleanDonation).filter((donation) => donation !== null)
 
     res.json(cleanDonations)
@@ -358,6 +364,9 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
       description,
       category,
       quantity,
+      weight,
+      donation_reason,
+      contact_info,
       expiry_date,
       pickup_address,
       latitude,
@@ -366,7 +375,6 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
       pickup_longitude,
     } = req.body
 
-    // Validar campos requeridos
     if (!title || !description || !category || !quantity) {
       console.error("❌ [BACKEND] Campos faltantes:", {
         title: !!title,
@@ -379,7 +387,6 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
       })
     }
 
-    // Obtener coordenadas (priorizar pickup_latitude/pickup_longitude)
     const finalLatitude = pickup_latitude || latitude
     const finalLongitude = pickup_longitude || longitude
 
@@ -397,7 +404,6 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
       })
     }
 
-    // Validar que las coordenadas sean números válidos
     const lat = Number.parseFloat(finalLatitude)
     const lng = Number.parseFloat(finalLongitude)
 
@@ -413,7 +419,6 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
       })
     }
 
-    // Usar dirección proporcionada o generar una por defecto
     const address = pickup_address || `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`
 
     console.log("✅ [BACKEND] Datos validados:", {
@@ -421,6 +426,9 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
       description,
       category,
       quantity: Number.parseInt(quantity),
+      weight: weight ? Number.parseFloat(weight) : null,
+      donation_reason,
+      contact_info,
       expiry_date,
       address,
       coordinates: { lat, lng },
@@ -428,15 +436,19 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
 
     const [result] = await pool.execute(
       `INSERT INTO donations (
-        donor_id, title, description, category, quantity, expiry_date, 
+        donor_id, title, description, category, quantity, weight, 
+        donation_reason, contact_info, expiry_date, 
         pickup_address, pickup_latitude, pickup_longitude, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.id,
         title.trim(),
         description.trim(),
         category.toLowerCase().trim(),
         Number.parseInt(quantity),
+        weight ? Number.parseFloat(weight) : null,
+        donation_reason ? donation_reason.trim() : null,
+        contact_info ? contact_info.trim() : null,
         expiry_date || null,
         address.trim(),
         Number.parseFloat(lat.toFixed(6)),
@@ -461,16 +473,151 @@ app.post("/api/donations", authenticateToken, async (req, res) => {
   }
 })
 
+app.post("/api/donations/batch", authenticateToken, async (req, res) => {
+  try {
+    console.log("📥 [BACKEND] Datos recibidos para crear donaciones en lote:", req.body)
+
+    const { donations } = req.body
+
+    if (!Array.isArray(donations) || donations.length === 0) {
+      return res.status(400).json({
+        error: "Debe proporcionar un array de donaciones",
+      })
+    }
+
+    if (donations.length > 20) {
+      return res.status(400).json({
+        error: "No se pueden crear más de 20 donaciones a la vez",
+      })
+    }
+
+    // Validate all donations
+    for (let i = 0; i < donations.length; i++) {
+      const donation = donations[i]
+
+      if (!donation.title || !donation.description || !donation.category || !donation.quantity) {
+        return res.status(400).json({
+          error: `Donación ${i + 1}: Los campos título, descripción, categoría y cantidad son requeridos`,
+        })
+      }
+
+      const finalLatitude = donation.pickup_latitude || donation.latitude
+      const finalLongitude = donation.pickup_longitude || donation.longitude
+
+      if (!finalLatitude || !finalLongitude) {
+        return res.status(400).json({
+          error: `Donación ${i + 1}: Las coordenadas de ubicación son requeridas`,
+        })
+      }
+
+      const lat = Number.parseFloat(finalLatitude)
+      const lng = Number.parseFloat(finalLongitude)
+
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({
+          error: `Donación ${i + 1}: Las coordenadas deben ser números válidos`,
+        })
+      }
+    }
+
+    // Create all donations in a transaction
+    const connection = await pool.getConnection()
+    await connection.beginTransaction()
+
+    try {
+      const createdIds = []
+
+      for (const donation of donations) {
+        const finalLatitude = donation.pickup_latitude || donation.latitude
+        const finalLongitude = donation.pickup_longitude || donation.longitude
+        const lat = Number.parseFloat(finalLatitude)
+        const lng = Number.parseFloat(finalLongitude)
+        const address = donation.pickup_address || `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`
+
+        const [result] = await connection.execute(
+          `INSERT INTO donations (
+            donor_id, title, description, category, quantity, weight, 
+            donation_reason, contact_info, expiry_date, 
+            pickup_address, pickup_latitude, pickup_longitude, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            req.user.id,
+            donation.title.trim(),
+            donation.description.trim(),
+            donation.category.toLowerCase().trim(),
+            Number.parseInt(donation.quantity),
+            donation.weight ? Number.parseFloat(donation.weight) : null,
+            donation.donation_reason ? donation.donation_reason.trim() : null,
+            donation.contact_info ? donation.contact_info.trim() : null,
+            donation.expiry_date || null,
+            address.trim(),
+            Number.parseFloat(lat.toFixed(6)),
+            Number.parseFloat(lng.toFixed(6)),
+            "available",
+          ],
+        )
+
+        createdIds.push(result.insertId)
+      }
+
+      await connection.commit()
+      connection.release()
+
+      console.log("✅ [BACKEND] Donaciones creadas en lote con IDs:", createdIds)
+
+      res.status(201).json({
+        message: `${createdIds.length} donaciones creadas exitosamente`,
+        donationIds: createdIds,
+        count: createdIds.length,
+      })
+    } catch (error) {
+      await connection.rollback()
+      connection.release()
+      throw error
+    }
+  } catch (error) {
+    console.error("❌ [BACKEND] Error creando donaciones en lote:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+})
+
 app.post("/api/donations/:id/reserve", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
+    const { pickup_time, pickup_person_name, pickup_person_id } = req.body
+
+    console.log("📥 [BACKEND] Reservando donación con detalles:", {
+      id,
+      pickup_time,
+      pickup_person_name,
+      pickup_person_id,
+      user_id: req.user.id,
+    })
 
     if (!id || isNaN(Number.parseInt(id))) {
       return res.status(400).json({ error: "ID de donación inválido" })
     }
 
-    // Verificar que la donación existe y está disponible
-    const [donations] = await pool.execute("SELECT id FROM donations WHERE id = ? AND status = 'available'", [
+    // Validate organization user type
+    if (req.user.userType !== "organization") {
+      return res.status(403).json({ error: "Solo las organizaciones pueden reservar donaciones" })
+    }
+
+    // Validate required fields for organizations
+    if (!pickup_time || !pickup_person_name || !pickup_person_id) {
+      return res.status(400).json({
+        error: "Debe proporcionar hora de recogida, nombre de la persona y cédula",
+      })
+    }
+
+    // Validate pickup_person_id format (basic validation)
+    if (pickup_person_id.length < 6 || pickup_person_id.length > 20) {
+      return res.status(400).json({
+        error: "La cédula debe tener entre 6 y 20 caracteres",
+      })
+    }
+
+    const [donations] = await pool.execute("SELECT id, donor_id FROM donations WHERE id = ? AND status = 'available'", [
       Number.parseInt(id),
     ])
 
@@ -478,36 +625,71 @@ app.post("/api/donations/:id/reserve", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Donación no disponible para reservar" })
     }
 
-    // Reservar la donación
+    // Generate random 6-digit verification code
+    const verification_code = Math.floor(100000 + Math.random() * 900000).toString()
+
+    console.log("🔐 [BACKEND] Código de verificación generado:", verification_code)
+
     const [result] = await pool.execute(
-      "UPDATE donations SET status = 'reserved', reserved_by = ?, reserved_at = NOW() WHERE id = ?",
-      [req.user.id, Number.parseInt(id)],
+      `UPDATE donations SET 
+        status = 'reserved', 
+        reserved_by = ?, 
+        reserved_at = NOW(),
+        pickup_time = ?,
+        pickup_person_name = ?,
+        pickup_person_id = ?,
+        verification_code = ?,
+        business_confirmed = FALSE
+      WHERE id = ?`,
+      [
+        req.user.id,
+        pickup_time,
+        pickup_person_name.trim(),
+        pickup_person_id.trim(),
+        verification_code,
+        Number.parseInt(id),
+      ],
     )
 
     if (result.affectedRows === 0) {
       return res.status(400).json({ error: "No se pudo reservar la donación" })
     }
 
-    res.json({ message: "Donación reservada exitosamente" })
+    console.log("✅ [BACKEND] Donación reservada exitosamente")
+
+    res.json({
+      message: "Donación reservada exitosamente. Esperando confirmación del comercio.",
+      verification_code: verification_code,
+      pickup_time: pickup_time,
+      pickup_person_name: pickup_person_name,
+    })
   } catch (error) {
-    console.error("Error reservando donación:", error)
+    console.error("❌ [BACKEND] Error reservando donación:", error)
     res.status(500).json({ error: "Error interno del servidor" })
   }
 })
 
-app.post("/api/donations/:id/confirm", authenticateToken, async (req, res) => {
+app.post("/api/donations/:id/business-confirm", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
+    const { accept } = req.body
+
+    console.log("📥 [BACKEND] Confirmación de comercio:", {
+      id,
+      accept,
+      user_id: req.user.id,
+    })
 
     if (!id || isNaN(Number.parseInt(id))) {
       return res.status(400).json({ error: "ID de donación inválido" })
     }
 
-    // Obtener información de la donación
+    if (typeof accept !== "boolean") {
+      return res.status(400).json({ error: "Debe especificar si acepta o rechaza" })
+    }
+
     const [donations] = await pool.execute(
-      `SELECT id, donor_id, reserved_by, status, 
-       COALESCE(donor_confirmed, FALSE) as donor_confirmed,
-       COALESCE(recipient_confirmed, FALSE) as recipient_confirmed
+      `SELECT id, donor_id, reserved_by, status, business_confirmed 
        FROM donations WHERE id = ?`,
       [Number.parseInt(id)],
     )
@@ -518,24 +700,131 @@ app.post("/api/donations/:id/confirm", authenticateToken, async (req, res) => {
 
     const donation = donations[0]
 
-    // Validar que la donación esté reservada
+    // Verify user is the donor
+    if (donation.donor_id !== req.user.id) {
+      return res.status(403).json({ error: "Solo el donante puede confirmar la hora de recogida" })
+    }
+
+    if (donation.status !== "reserved") {
+      return res.status(400).json({ error: "La donación debe estar reservada" })
+    }
+
+    if (donation.business_confirmed) {
+      return res.status(400).json({ error: "Ya confirmaste esta reserva" })
+    }
+
+    if (accept) {
+      // Accept the pickup time
+      const [result] = await pool.execute(
+        `UPDATE donations SET 
+          business_confirmed = TRUE, 
+          business_confirmed_at = NOW() 
+        WHERE id = ?`,
+        [Number.parseInt(id)],
+      )
+
+      if (result.affectedRows === 0) {
+        return res.status(400).json({ error: "No se pudo confirmar la reserva" })
+      }
+
+      console.log("✅ [BACKEND] Comercio aceptó la hora de recogida")
+
+      res.json({
+        message: "Hora de recogida aceptada. La organización puede proceder con la recogida.",
+      })
+    } else {
+      // Reject the pickup time - cancel reservation
+      const [result] = await pool.execute(
+        `UPDATE donations SET 
+          status = 'available',
+          reserved_by = NULL,
+          reserved_at = NULL,
+          pickup_time = NULL,
+          pickup_person_name = NULL,
+          pickup_person_id = NULL,
+          verification_code = NULL,
+          business_confirmed = FALSE,
+          business_confirmed_at = NULL
+        WHERE id = ?`,
+        [Number.parseInt(id)],
+      )
+
+      if (result.affectedRows === 0) {
+        return res.status(400).json({ error: "No se pudo rechazar la reserva" })
+      }
+
+      console.log("❌ [BACKEND] Comercio rechazó la hora de recogida")
+
+      res.json({
+        message: "Reserva rechazada. La donación está disponible nuevamente.",
+      })
+    }
+  } catch (error) {
+    console.error("❌ [BACKEND] Error en confirmación de comercio:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+})
+
+app.post("/api/donations/:id/confirm", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { verification_code } = req.body
+
+    console.log("📥 [BACKEND] Confirmando donación:", {
+      id,
+      verification_code,
+      user_id: req.user.id,
+    })
+
+    if (!id || isNaN(Number.parseInt(id))) {
+      return res.status(400).json({ error: "ID de donación inválido" })
+    }
+
+    if (!verification_code) {
+      return res.status(400).json({ error: "Código de verificación requerido" })
+    }
+
+    const [donations] = await pool.execute(
+      `SELECT id, donor_id, reserved_by, status, verification_code,
+       COALESCE(donor_confirmed, FALSE) as donor_confirmed,
+       COALESCE(recipient_confirmed, FALSE) as recipient_confirmed,
+       COALESCE(business_confirmed, FALSE) as business_confirmed
+       FROM donations WHERE id = ?`,
+      [Number.parseInt(id)],
+    )
+
+    if (!donations || donations.length === 0) {
+      return res.status(404).json({ error: "Donación no encontrada" })
+    }
+
+    const donation = donations[0]
+
     if (donation.status !== "reserved") {
       return res.status(400).json({ error: "La donación debe estar reservada para confirmar" })
     }
 
-    // Determinar si es donante u organización
+    // Verify business has confirmed the pickup time
+    if (!donation.business_confirmed) {
+      return res.status(400).json({
+        error: "El comercio aún no ha aceptado la hora de recogida",
+      })
+    }
+
+    // Verify the verification code
+    if (donation.verification_code !== verification_code.trim()) {
+      return res.status(400).json({ error: "Código de verificación incorrecto" })
+    }
+
     let updateQuery = ""
     let message = ""
 
     if (donation.donor_id === req.user.id) {
-      // Es el donante
       if (donation.donor_confirmed) {
         return res.status(400).json({ error: "Ya confirmaste esta donación" })
       }
       updateQuery = "UPDATE donations SET donor_confirmed = TRUE, donor_confirmed_at = NOW()"
       message = "Confirmación de donante registrada"
     } else if (donation.reserved_by === req.user.id) {
-      // Es la organización
       if (donation.recipient_confirmed) {
         return res.status(400).json({ error: "Ya confirmaste esta donación" })
       }
@@ -545,7 +834,6 @@ app.post("/api/donations/:id/confirm", authenticateToken, async (req, res) => {
       return res.status(403).json({ error: "No tienes permisos para confirmar esta donación" })
     }
 
-    // Si ambos ya confirmaron, marcar como completada
     const bothConfirmed =
       (donation.donor_confirmed || donation.donor_id === req.user.id) &&
       (donation.recipient_confirmed || donation.reserved_by === req.user.id)
@@ -557,21 +845,21 @@ app.post("/api/donations/:id/confirm", authenticateToken, async (req, res) => {
 
     updateQuery += " WHERE id = ?"
 
-    // Ejecutar la actualización
     const [result] = await pool.execute(updateQuery, [Number.parseInt(id)])
 
     if (result.affectedRows === 0) {
       return res.status(400).json({ error: "No se pudo confirmar la donación" })
     }
 
+    console.log("✅ [BACKEND] Confirmación exitosa")
+
     res.json({ message })
   } catch (error) {
-    console.error("Error confirmando donación:", error)
+    console.error("❌ [BACKEND] Error confirmando donación:", error)
     res.status(500).json({ error: "Error interno del servidor" })
   }
 })
 
-// Rutas de estadísticas
 app.get("/api/stats", authenticateToken, async (req, res) => {
   try {
     console.log("📊 [BACKEND] Calculando estadísticas para usuario:", {
@@ -587,7 +875,6 @@ app.get("/api/stats", authenticateToken, async (req, res) => {
     }
 
     if (req.user.userType === "donor") {
-      // Estadísticas para donantes (sus propias donaciones)
       const [totalDonations] = await pool.execute("SELECT COUNT(*) as count FROM donations WHERE donor_id = ?", [
         req.user.id,
       ])
@@ -607,7 +894,6 @@ app.get("/api/stats", authenticateToken, async (req, res) => {
         impactScore: (completedDonations[0]?.count || 0) * 10,
       }
     } else if (req.user.userType === "organization") {
-      // Estadísticas para organizaciones (donaciones que han reservado/completado)
       const [totalReserved] = await pool.execute("SELECT COUNT(*) as count FROM donations WHERE reserved_by = ?", [
         req.user.id,
       ])
@@ -636,7 +922,6 @@ app.get("/api/stats", authenticateToken, async (req, res) => {
   }
 })
 
-// Ruta de prueba
 app.get("/api/test", (req, res) => {
   res.json({
     message: "API funcionando correctamente",
@@ -645,7 +930,6 @@ app.get("/api/test", (req, res) => {
   })
 })
 
-// Iniciar servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`)
 })
