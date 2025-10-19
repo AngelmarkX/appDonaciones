@@ -83,12 +83,27 @@ const DashboardScreen = ({ navigation }) => {
 
   const getCategoryLabel = (category) => {
     const categories = {
+      // Alimentos
       bakery: "Panadería",
       dairy: "Lácteos",
       fruits: "Frutas y Verduras",
+      vegetables: "Verduras",
       meat: "Carnes",
       canned: "Enlatados",
       prepared: "Comida Preparada",
+      beverages: "Bebidas",
+      grains: "Granos y Cereales",
+      snacks: "Snacks",
+      // Objetos generales
+      clothing: "Ropa",
+      furniture: "Muebles",
+      electronics: "Electrónicos",
+      books: "Libros",
+      toys: "Juguetes",
+      sports: "Deportes",
+      tools: "Herramientas",
+      kitchenware: "Utensilios de Cocina",
+      hygiene: "Higiene Personal",
       other: "Otros",
     }
     return categories[category] || category

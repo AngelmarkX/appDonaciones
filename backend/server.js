@@ -985,7 +985,7 @@ app.get("/api/users/directory", authenticateToken, async (req, res) => {
   try {
     const [users] = await pool.execute(
       `SELECT 
-        id, name, phone, user_type, donation_days 
+        id, name, phone, user_type, address, donation_days 
       FROM users 
       WHERE id != ? 
       ORDER BY name ASC`,
@@ -995,10 +995,17 @@ app.get("/api/users/directory", authenticateToken, async (req, res) => {
     const usersWithDays = users.map((user) => {
       if (user.donation_days) {
         try {
-          user.donation_days = JSON.parse(user.donation_days)
+          // Si es string, parsearlo
+          if (typeof user.donation_days === "string") {
+            user.donation_days = JSON.parse(user.donation_days)
+          }
+          // Si ya es objeto, dejarlo como está
         } catch (e) {
+          console.error(`Error parsing donation_days for user ${user.id}:`, e)
           user.donation_days = null
         }
+      } else {
+        user.donation_days = null
       }
       return user
     })

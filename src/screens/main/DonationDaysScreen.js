@@ -44,14 +44,22 @@ const DonationDaysScreen = ({ navigation }) => {
 
       const data = await response.json()
 
+      console.log("[v0] Profile loaded:", {
+        ok: response.ok,
+        hasUser: !!data.user,
+        hasDonationDays: !!data.user?.donation_days,
+        donation_days: data.user?.donation_days,
+      })
+
       if (response.ok && data.user) {
         setUserProfile(data.user)
         if (data.user.donation_days) {
           setAvailabilityData(data.user.donation_days)
+          console.log("[v0] Loaded donation_days from profile:", data.user.donation_days)
         }
       }
     } catch (error) {
-      console.error("Error loading donation days:", error)
+      console.error("[v0] Error loading donation days:", error)
     }
   }
 
@@ -73,19 +81,34 @@ const DonationDaysScreen = ({ navigation }) => {
 
     setLoading(true)
     try {
+      const requestBody = {
+        name: userProfile.name,
+        email: userProfile.email,
+        phone: userProfile.phone,
+        address: userProfile.address,
+        donation_days: availabilityData,
+      }
+
+      console.log("[v0] Saving donation days with data:", {
+        name: requestBody.name,
+        email: requestBody.email,
+        hasDonationDays: !!requestBody.donation_days,
+        donation_days: requestBody.donation_days,
+      })
+
       const response = await fetch(`http://192.168.1.5:3006/api/users/profile`, {
         method: "PUT",
         headers: authService.getAuthHeaders(),
-        body: JSON.stringify({
-          name: userProfile.name,
-          email: userProfile.email,
-          phone: userProfile.phone,
-          address: userProfile.address,
-          donation_days: availabilityData,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
+
+      console.log("[v0] Save response:", {
+        ok: response.ok,
+        status: response.status,
+        data: data,
+      })
 
       if (!response.ok) {
         throw new Error(data.error || "Error guardando configuración")
@@ -95,7 +118,7 @@ const DonationDaysScreen = ({ navigation }) => {
         { text: "OK", onPress: () => navigation.goBack() },
       ])
     } catch (error) {
-      console.error("Error saving donation days:", error)
+      console.error("[v0] Error saving donation days:", error)
       Alert.alert("Error", error.message || "No se pudo guardar la configuración")
     } finally {
       setLoading(false)
@@ -115,7 +138,9 @@ const DonationDaysScreen = ({ navigation }) => {
       <ScrollView style={styles.scrollView}>
         <Card style={styles.card}>
           <Text style={styles.description}>
-            Configura los días en los que tu comercio puede recibir solicitudes de donación
+            {userProfile?.user_type === "donor"
+              ? "Configura los días en los que tu comercio puede realizar donaciones"
+              : "Configura los días en los que tu organización puede recibir donaciones"}
           </Text>
 
           <View style={styles.daysContainer}>
@@ -145,7 +170,9 @@ const DonationDaysScreen = ({ navigation }) => {
           <View style={styles.infoBox}>
             <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
             <Text style={styles.infoText}>
-              Los días marcados son aquellos en los que aceptarás solicitudes de donación
+              {userProfile?.user_type === "donor"
+                ? "Los días marcados son aquellos en los que podrás realizar donaciones"
+                : "Los días marcados son aquellos en los que podrás recibir donaciones"}
             </Text>
           </View>
         </Card>

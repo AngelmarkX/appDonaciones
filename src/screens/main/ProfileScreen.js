@@ -34,16 +34,15 @@ const ProfileScreen = ({ navigation }) => {
       subtitle: "Actualiza tu información personal",
       onPress: () => navigation.navigate("EditProfile"),
     },
-    ...(user?.userType === "donor"
-      ? [
-          {
-            icon: "calendar-outline",
-            title: "Días de Donación",
-            subtitle: "Configura tus días disponibles",
-            onPress: () => navigation.navigate("DonationDays"),
-          },
-        ]
-      : []),
+    {
+      icon: "calendar-outline",
+      title: "Días de Donación",
+      subtitle:
+        user?.userType === "donor"
+          ? "Configura tus días disponibles para donar"
+          : "Configura tus días disponibles para recibir",
+      onPress: () => navigation.navigate("DonationDays"),
+    },
     {
       icon: "download-outline",
       title: "Exportar Historial PDF",

@@ -46,6 +46,21 @@ const UsersScreen = () => {
 
     if (!donationDays) return "No configurado"
 
+    // Si es un string, intentar parsearlo
+    let parsedDays = donationDays
+    if (typeof donationDays === "string") {
+      try {
+        parsedDays = JSON.parse(donationDays)
+      } catch (e) {
+        return "No configurado"
+      }
+    }
+
+    // Verificar que sea un objeto válido
+    if (typeof parsedDays !== "object" || parsedDays === null) {
+      return "No configurado"
+    }
+
     const dayNames = {
       monday: "Lun",
       tuesday: "Mar",
@@ -57,7 +72,7 @@ const UsersScreen = () => {
     }
 
     const activeDays = Object.keys(dayNames)
-      .filter((day) => donationDays[day]?.available)
+      .filter((day) => parsedDays[day]?.available === true)
       .map((day) => dayNames[day])
 
     console.log("[v0] Active days found:", activeDays)
