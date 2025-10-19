@@ -28,6 +28,10 @@ const DonationsScreen = ({ navigation, route }) => {
   const [donations, setDonations] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState("all")
+  const [searchText, setSearchText] = useState("")
+  const [selectedCategories, setSelectedCategories] = useState([])
+  const [showCategoryFilters, setShowCategoryFilters] = useState(false)
+  // </CHANGE>
   const [expandedDonations, setExpandedDonations] = useState(new Set())
   const [reservationModalVisible, setReservationModalVisible] = useState(false)
   const [selectedDonationId, setSelectedDonationId] = useState(null)
@@ -467,6 +471,80 @@ const DonationsScreen = ({ navigation, route }) => {
     setOrgReviewModalVisible(true)
   }
 
+  const CATEGORIES = [
+    { id: "bakery", label: "Panadería", icon: "🥖", type: "food" },
+    { id: "dairy", label: "Lácteos", icon: "🥛", type: "food" },
+    { id: "fruits", label: "Frutas y Verduras", icon: "🍎", type: "food" },
+    { id: "meat", label: "Carnes", icon: "🥩", type: "food" },
+    { id: "canned", label: "Enlatados", icon: "🥫", type: "food" },
+    { id: "prepared", label: "Comida Preparada", icon: "🍱", type: "food" },
+    { id: "sugar", label: "Azúcares", icon: "🍬", type: "food" },
+    { id: "fats", label: "Grasas", icon: "🧈", type: "food" },
+    { id: "cereals", label: "Cereales", icon: "🌾", type: "food" },
+    { id: "beverages", label: "Bebidas", icon: "🥤", type: "food" },
+    { id: "furniture", label: "Muebles", icon: "🪑", type: "general" },
+    { id: "electronics", label: "Electrónicos", icon: "📱", type: "general" },
+    { id: "clothing", label: "Ropa", icon: "👕", type: "general" },
+    { id: "books", label: "Libros", icon: "📚", type: "general" },
+    { id: "toys", label: "Juguetes", icon: "🧸", type: "general" },
+    { id: "appliances", label: "Electrodomésticos", icon: "🔌", type: "general" },
+    { id: "tools", label: "Herramientas", icon: "🔧", type: "general" },
+    { id: "sports", label: "Deportes", icon: "⚽", type: "general" },
+    { id: "office", label: "Oficina", icon: "📎", type: "general" },
+    { id: "other", label: "Otros", icon: "📦", type: "general" },
+  ]
+  // </CHANGE>
+
+  const getFilteredDonations = () => {
+    let filtered = donations
+
+    // Apply status filter
+    if (filter !== "all" && filter !== "received") {
+      filtered = filtered.filter((donation) => donation.status === filter)
+    }
+
+    // Apply search text filter
+    if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase()
+      filtered = filtered.filter((donation) => {
+        return (
+          donation.title?.toLowerCase().includes(searchLower) ||
+          donation.description?.toLowerCase().includes(searchLower) ||
+          donation.category?.toLowerCase().includes(searchLower) ||
+          getCategoryLabel(donation.category).toLowerCase().includes(searchLower) ||
+          donation.donor_name?.toLowerCase().includes(searchLower) ||
+          donation.pickup_address?.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+
+    // Apply category filter
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter((donation) => selectedCategories.includes(donation.category))
+    }
+
+    return filtered
+  }
+
+  const toggleCategoryFilter = (categoryId) => {
+    setSelectedCategories((prev) => {
+      if (prev.includes(categoryId)) {
+        return prev.filter((id) => id !== categoryId)
+      } else {
+        return [...prev, categoryId]
+      }
+    })
+  }
+
+  const clearAllFilters = () => {
+    setSearchText("")
+    setSelectedCategories([])
+    setFilter("all")
+  }
+
+  const hasActiveFilters = searchText.trim() || selectedCategories.length > 0 || filter !== "all"
+  // </CHANGE>
+
   const renderDonation = ({ item: donation }) => {
     const highlighted = isHighlighted(donation.id)
     const isExpanded = expandedDonations.has(donation.id)
@@ -875,6 +953,9 @@ const DonationsScreen = ({ navigation, route }) => {
     { key: "completed", label: "Completadas" },
   ]
 
+  const displayedDonations = getFilteredDonations()
+  // </CHANGE>
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -887,7 +968,66 @@ const DonationsScreen = ({ navigation, route }) => {
         </Text>
       </View>
 
-      {/* Filtros */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputWrapper}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por título, categoría, donante..."
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholderTextColor={colors.textSecondary}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText("")} style={styles.clearSearchButton}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.categoryFilterButton, showCategoryFilters && styles.categoryFilterButtonActive]}
+          onPress={() => setShowCategoryFilters(!showCategoryFilters)}
+        >
+          <Ionicons
+            name="filter"
+            size={20}
+            color={selectedCategories.length > 0 ? colors.primary : colors.textSecondary}
+          />
+          {selectedCategories.length > 0 && <View style={styles.filterBadge} />}
+        </TouchableOpacity>
+      </View>
+      {/* </CHANGE> */}
+
+      {showCategoryFilters && (
+        <View style={styles.categoryFiltersContainer}>
+          <Text style={styles.categoryFiltersTitle}>Filtrar por categoría:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryFiltersList}>
+            {CATEGORIES.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.categoryFilterChip,
+                  selectedCategories.includes(category.id) && styles.categoryFilterChipActive,
+                ]}
+                onPress={() => toggleCategoryFilter(category.id)}
+              >
+                <Text style={styles.categoryFilterIcon}>{category.icon}</Text>
+                <Text
+                  style={[
+                    styles.categoryFilterLabel,
+                    selectedCategories.includes(category.id) && styles.categoryFilterLabelActive,
+                  ]}
+                >
+                  {category.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+      {/* </CHANGE> */}
+
+      {/* Filtros de estado */}
       <View style={styles.filtersWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContainer}>
           {filterOptions.map((option) => (
@@ -902,31 +1042,48 @@ const DonationsScreen = ({ navigation, route }) => {
         </ScrollView>
       </View>
 
+      {hasActiveFilters && (
+        <View style={styles.resultsContainer}>
+          <Text style={styles.resultsText}>
+            {displayedDonations.length} resultado{displayedDonations.length !== 1 ? "s" : ""}
+            {searchText && ` para "${searchText}"`}
+          </Text>
+          <TouchableOpacity onPress={clearAllFilters} style={styles.clearFiltersButton}>
+            <Ionicons name="close-circle" size={16} color={colors.primary} />
+            <Text style={styles.clearFiltersText}>Limpiar filtros</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {/* </CHANGE> */}
+
       {/* Lista de donaciones */}
       <FlatList
         ref={flatListRef}
-        data={donations}
+        data={displayedDonations}
         renderItem={renderDonation}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadDonations} />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search-outline" size={64} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>
+              {hasActiveFilters ? "No se encontraron donaciones con los filtros aplicados" : "No hay donaciones"}
+            </Text>
+            {hasActiveFilters && (
+              <TouchableOpacity onPress={clearAllFilters} style={styles.emptyButton}>
+                <Text style={styles.emptyButtonText}>Limpiar filtros</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        }
+        // </CHANGE>
         onScrollToIndexFailed={(info) => {
           const wait = new Promise((resolve) => setTimeout(resolve, 500))
           wait.then(() => {
             flatListRef.current?.scrollToIndex({ index: info.index, animated: true })
           })
         }}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="gift-outline" size={64} color={colors.textSecondary} />
-            <Text style={styles.emptyTitle}>No hay donaciones</Text>
-            <Text style={styles.emptyText}>
-              {user?.userType === "donor"
-                ? "Aún no has creado ninguna donación"
-                : "No hay donaciones disponibles en este momento"}
-            </Text>
-          </View>
-        }
       />
 
       {/* Reservation Modal */}
@@ -1364,6 +1521,129 @@ const styles = StyleSheet.create({
     fontWeight: typography.bold,
     color: colors.textPrimary,
   },
+  searchContainer: {
+    flexDirection: "row",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: typography.base,
+    color: colors.textPrimary,
+    paddingVertical: spacing.sm,
+  },
+  clearSearchButton: {
+    padding: spacing.xs,
+  },
+  categoryFilterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  categoryFilterButtonActive: {
+    backgroundColor: colors.primaryLight + "20",
+    borderColor: colors.primary,
+  },
+  filterBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  categoryFiltersContainer: {
+    backgroundColor: colors.white,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  categoryFiltersTitle: {
+    fontSize: typography.sm,
+    fontWeight: typography.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  categoryFiltersList: {
+    flexDirection: "row",
+  },
+  categoryFilterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginRight: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  categoryFilterChipActive: {
+    backgroundColor: colors.primaryLight + "20",
+    borderColor: colors.primary,
+  },
+  categoryFilterIcon: {
+    fontSize: 16,
+  },
+  categoryFilterLabel: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+  },
+  categoryFilterLabelActive: {
+    color: colors.primary,
+    fontWeight: typography.medium,
+  },
+  resultsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primaryLight + "10",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  resultsText: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+  },
+  clearFiltersButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  clearFiltersText: {
+    fontSize: typography.sm,
+    color: colors.primary,
+    fontWeight: typography.medium,
+  },
+  // </CHANGE>
   filtersWrapper: {
     backgroundColor: colors.white,
     borderBottomWidth: 1,
@@ -1578,23 +1858,31 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   emptyContainer: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     paddingVertical: spacing["3xl"],
     paddingHorizontal: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: typography.xl,
-    fontWeight: typography.bold,
-    color: colors.textPrimary,
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
   },
   emptyText: {
     fontSize: typography.base,
     color: colors.textSecondary,
     textAlign: "center",
-    lineHeight: typography.lineHeight.relaxed * typography.base,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
+  emptyButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    fontSize: typography.sm,
+    color: colors.white,
+    fontWeight: typography.medium,
+  },
+  // </CHANGE>
   mapButton: {
     flexDirection: "row",
     alignItems: "center",

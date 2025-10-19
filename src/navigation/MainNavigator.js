@@ -10,6 +10,7 @@ import DonationsScreen from "../screens/main/DonationsScreen"
 import ProfileScreen from "../screens/main/ProfileScreen"
 import CreateDonationScreen from "../screens/main/CreateDonationScreen"
 import NotificationsScreen from "../screens/main/NotificationsScreen"
+import UsersScreen from "../screens/main/UsersScreen"
 
 // Profile Stack Screens
 import EditProfileScreen from "../screens/main/EditProfileScreen"
@@ -17,6 +18,7 @@ import NotificationSettingsScreen from "../screens/main/NotificationSettingsScre
 import LocationSettingsScreen from "../screens/main/LocationSettingsScreen"
 import HelpSupportScreen from "../screens/main/HelpSupportScreen"
 import AboutScreen from "../screens/main/AboutScreen"
+import DonationDaysScreen from "../screens/main/DonationDaysScreen"
 
 const Tab = createBottomTabNavigator()
 const Stack = createStackNavigator()
@@ -49,6 +51,7 @@ const ProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="DonationDays" component={DonationDaysScreen} options={{ headerShown: false }} />
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="LocationSettings" component={LocationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="HelpSupport" component={HelpSupportScreen} options={{ headerShown: false }} />
@@ -69,6 +72,8 @@ const MainNavigator = () => {
             iconName = focused ? "map" : "map-outline"
           } else if (route.name === "Donations") {
             iconName = focused ? "gift" : "gift-outline"
+          } else if (route.name === "Users") {
+            iconName = focused ? "people" : "people-outline"
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline"
           }
@@ -90,6 +95,7 @@ const MainNavigator = () => {
       <Tab.Screen name="Dashboard" component={DashboardStack} options={{ title: "Inicio" }} />
       <Tab.Screen name="Map" component={MapScreenWebView} options={{ title: "Mapa" }} />
       <Tab.Screen name="Donations" component={DonationsScreen} options={{ title: "Donaciones" }} />
+      <Tab.Screen name="Users" component={UsersScreen} options={{ title: "Usuarios" }} />
       <Tab.Screen name="Profile" component={ProfileStack} options={{ title: "Perfil" }} />
     </Tab.Navigator>
   )

@@ -6,6 +6,7 @@ import { useAuth } from "../../contexts/AuthContext"
 import { colors, typography, spacing } from "../../styles"
 import Card from "../../components/common/Card"
 import Badge from "../../components/common/Badge"
+import pdfExportService from "../../services/pdfExportService"
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuth()
@@ -17,12 +18,37 @@ const ProfileScreen = ({ navigation }) => {
     ])
   }
 
+  const handleExportPDF = async () => {
+    try {
+      Alert.alert("Exportando...", "Generando tu historial de donaciones en PDF")
+      await pdfExportService.exportDonationHistory()
+    } catch (error) {
+      Alert.alert("Error", "No se pudo generar el PDF: " + error.message)
+    }
+  }
+
   const menuItems = [
     {
       icon: "person-outline",
       title: "Editar Perfil",
       subtitle: "Actualiza tu información personal",
       onPress: () => navigation.navigate("EditProfile"),
+    },
+    ...(user?.userType === "donor"
+      ? [
+          {
+            icon: "calendar-outline",
+            title: "Días de Donación",
+            subtitle: "Configura tus días disponibles",
+            onPress: () => navigation.navigate("DonationDays"),
+          },
+        ]
+      : []),
+    {
+      icon: "download-outline",
+      title: "Exportar Historial PDF",
+      subtitle: "Descarga tu historial de donaciones",
+      onPress: handleExportPDF,
     },
     {
       icon: "notifications-outline",

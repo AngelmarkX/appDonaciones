@@ -188,7 +188,7 @@ app.post("/api/auth/register", async (req, res) => {
 
 app.put("/api/users/profile", authenticateToken, async (req, res) => {
   try {
-    const { name, email, phone, address } = req.body
+    const { name, email, phone, address, donation_days } = req.body
 
     console.log("📝 [BACKEND] Actualizando perfil usuario:", {
       userId: req.user.id,
@@ -196,6 +196,8 @@ app.put("/api/users/profile", authenticateToken, async (req, res) => {
       email,
       phone,
       address,
+      hasDonationDays: !!donation_days,
+      donation_days_data: donation_days,
     })
 
     if (!name || !email) {
@@ -208,24 +210,58 @@ app.put("/api/users/profile", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Este email ya está en uso por otro usuario" })
     }
 
-    const [result] = await pool.execute(
-      `UPDATE users SET 
-        name = ?, 
-        email = ?, 
-        phone = ?, 
-        address = ?
-      WHERE id = ?`,
-      [name.trim(), email.trim(), phone ? phone.trim() : null, address ? address.trim() : null, req.user.id],
-    )
+    let updateQuery = `UPDATE users SET 
+      name = ?, 
+      email = ?, 
+      phone = ?, 
+      address = ?`
+
+    const params = [name.trim(), email.trim(), phone ? phone.trim() : null, address ? address.trim() : null]
+
+    if (donation_days !== undefined) {
+      updateQuery += `, donation_days = ?`
+      const jsonString = JSON.stringify(donation_days)
+      params.push(jsonString)
+      console.log("💾 [BACKEND] Saving donation_days as JSON:", jsonString)
+    }
+
+    updateQuery += ` WHERE id = ?`
+    params.push(req.user.id)
+
+    console.log("🔍 [BACKEND] SQL Query:", updateQuery)
+    console.log("🔍 [BACKEND] SQL Params:", params)
+
+    const [result] = await pool.execute(updateQuery, params)
+
+    console.log("📊 [BACKEND] Update result:", {
+      affectedRows: result.affectedRows,
+      changedRows: result.changedRows,
+    })
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Usuario no encontrado" })
     }
 
     const [updatedUser] = await pool.execute(
-      "SELECT id, email, name, phone, address, user_type FROM users WHERE id = ?",
+      "SELECT id, email, name, phone, address, user_type, donation_days FROM users WHERE id = ?",
       [req.user.id],
     )
+
+    console.log("📖 [BACKEND] User from DB after update:", {
+      id: updatedUser[0].id,
+      donation_days_raw: updatedUser[0].donation_days,
+      donation_days_type: typeof updatedUser[0].donation_days,
+    })
+
+    if (updatedUser[0].donation_days) {
+      try {
+        updatedUser[0].donation_days = JSON.parse(updatedUser[0].donation_days)
+        console.log("✅ [BACKEND] Parsed donation_days successfully")
+      } catch (e) {
+        console.error("❌ [BACKEND] Error parsing donation_days:", e)
+        updatedUser[0].donation_days = null
+      }
+    }
 
     console.log("✅ [BACKEND] Perfil actualizado exitosamente")
 
@@ -235,6 +271,34 @@ app.put("/api/users/profile", authenticateToken, async (req, res) => {
     })
   } catch (error) {
     console.error("❌ [BACKEND] Error actualizando perfil:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+})
+
+app.get("/api/users/profile", authenticateToken, async (req, res) => {
+  try {
+    const [users] = await pool.execute(
+      "SELECT id, email, name, phone, address, user_type, donation_days FROM users WHERE id = ?",
+      [req.user.id],
+    )
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" })
+    }
+
+    const user = users[0]
+
+    if (user.donation_days) {
+      try {
+        user.donation_days = JSON.parse(user.donation_days)
+      } catch (e) {
+        user.donation_days = null
+      }
+    }
+
+    res.json({ user })
+  } catch (error) {
+    console.error("❌ [BACKEND] Error obteniendo perfil:", error)
     res.status(500).json({ error: "Error interno del servidor" })
   }
 })
@@ -334,12 +398,17 @@ app.get("/api/donations/my", authenticateToken, async (req, res) => {
         COALESCE(d.recipient_confirmed, FALSE) as recipient_confirmed,
         u.name as donor_name,
         u.phone as donor_phone,
-        u.email as donor_email
+        u.email as donor_email,
+        CASE 
+          WHEN d.donor_id = ? THEN 'given'
+          WHEN d.reserved_by = ? THEN 'received'
+          ELSE 'other'
+        END as donation_type
       FROM donations d 
       LEFT JOIN users u ON d.donor_id = u.id
-      WHERE d.donor_id = ? 
+      WHERE d.donor_id = ? OR d.reserved_by = ?
       ORDER BY d.created_at DESC`,
-      [req.user.id],
+      [req.user.id, req.user.id, req.user.id, req.user.id],
     )
 
     if (!Array.isArray(rows)) {
@@ -491,7 +560,6 @@ app.post("/api/donations/batch", authenticateToken, async (req, res) => {
       })
     }
 
-    // Validate all donations
     for (let i = 0; i < donations.length; i++) {
       const donation = donations[i]
 
@@ -520,7 +588,6 @@ app.post("/api/donations/batch", authenticateToken, async (req, res) => {
       }
     }
 
-    // Create all donations in a transaction
     const connection = await pool.getConnection()
     await connection.beginTransaction()
 
@@ -598,19 +665,16 @@ app.post("/api/donations/:id/reserve", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "ID de donación inválido" })
     }
 
-    // Validate organization user type
     if (req.user.userType !== "organization") {
       return res.status(403).json({ error: "Solo las organizaciones pueden reservar donaciones" })
     }
 
-    // Validate required fields for organizations
     if (!pickup_time || !pickup_person_name || !pickup_person_id) {
       return res.status(400).json({
         error: "Debe proporcionar hora de recogida, nombre de la persona y cédula",
       })
     }
 
-    // Validate pickup_person_id format (basic validation)
     if (pickup_person_id.length < 6 || pickup_person_id.length > 20) {
       return res.status(400).json({
         error: "La cédula debe tener entre 6 y 20 caracteres",
@@ -625,7 +689,6 @@ app.post("/api/donations/:id/reserve", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Donación no disponible para reservar" })
     }
 
-    // Generate random 6-digit verification code
     const verification_code = Math.floor(100000 + Math.random() * 900000).toString()
 
     console.log("🔐 [BACKEND] Código de verificación generado:", verification_code)
@@ -700,7 +763,6 @@ app.post("/api/donations/:id/business-confirm", authenticateToken, async (req, r
 
     const donation = donations[0]
 
-    // Verify user is the donor
     if (donation.donor_id !== req.user.id) {
       return res.status(403).json({ error: "Solo el donante puede confirmar la hora de recogida" })
     }
@@ -714,7 +776,6 @@ app.post("/api/donations/:id/business-confirm", authenticateToken, async (req, r
     }
 
     if (accept) {
-      // Accept the pickup time
       const [result] = await pool.execute(
         `UPDATE donations SET 
           business_confirmed = TRUE, 
@@ -733,7 +794,6 @@ app.post("/api/donations/:id/business-confirm", authenticateToken, async (req, r
         message: "Hora de recogida aceptada. La organización puede proceder con la recogida.",
       })
     } else {
-      // Reject the pickup time - cancel reservation
       const [result] = await pool.execute(
         `UPDATE donations SET 
           status = 'available',
@@ -803,14 +863,12 @@ app.post("/api/donations/:id/confirm", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "La donación debe estar reservada para confirmar" })
     }
 
-    // Verify business has confirmed the pickup time
     if (!donation.business_confirmed) {
       return res.status(400).json({
         error: "El comercio aún no ha aceptado la hora de recogida",
       })
     }
 
-    // Verify the verification code
     if (donation.verification_code !== verification_code.trim()) {
       return res.status(400).json({ error: "Código de verificación incorrecto" })
     }
@@ -918,6 +976,36 @@ app.get("/api/stats", authenticateToken, async (req, res) => {
     res.json(stats)
   } catch (error) {
     console.error("Error obteniendo estadísticas:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+})
+
+// Endpoint para obtener directorio de usuarios
+app.get("/api/users/directory", authenticateToken, async (req, res) => {
+  try {
+    const [users] = await pool.execute(
+      `SELECT 
+        id, name, phone, user_type, donation_days 
+      FROM users 
+      WHERE id != ? 
+      ORDER BY name ASC`,
+      [req.user.id],
+    )
+
+    const usersWithDays = users.map((user) => {
+      if (user.donation_days) {
+        try {
+          user.donation_days = JSON.parse(user.donation_days)
+        } catch (e) {
+          user.donation_days = null
+        }
+      }
+      return user
+    })
+
+    res.json(usersWithDays)
+  } catch (error) {
+    console.error("Error obteniendo directorio:", error)
     res.status(500).json({ error: "Error interno del servidor" })
   }
 })
