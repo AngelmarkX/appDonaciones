@@ -41,6 +41,15 @@ const MapScreenWebView = ({ route, navigation }) => {
       cereals: "Cereales",
       beverages: "Bebidas",
       other: "Otros",
+      furniture: "Muebles",
+      electronics: "Electrónicos",
+      clothing: "Ropa",
+      books: "Libros",
+      toys: "Juguetes",
+      appliances: "Electrodomésticos",
+      tools: "Herramientas",
+      sports: "Deportes",
+      office: "Oficina",
     }
     return categoryLabels[category] || category
   }
@@ -1084,7 +1093,16 @@ ${networkInfo.referer || "Ninguno"}
               fats: 'Grasas',
               cereals: 'Cereales',
               beverages: 'Bebidas',
-              other: 'Otros'
+              other: 'Otros',
+              furniture: 'Muebles',
+              electronics: 'Electrónicos',
+              clothing: 'Ropa',
+              books: 'Libros',
+              toys: 'Juguetes',
+              appliances: 'Electrodomésticos',
+              tools: 'Herramientas',
+              sports: 'Deportes',
+              office: 'Oficina',
             };
             
             function getCategoryLabel(category) {
@@ -1150,7 +1168,17 @@ ${networkInfo.referer || "Ninguno"}
                 fats: '🧈',
                 cereals: '🌾',
                 beverages: '🥤',
-                other: '📦'
+                other: '📦',
+                // Añadiendo iconos para categorías generales
+                furniture: '🛋️',
+                electronics: '💻',
+                clothing: '👕',
+                books: '📚',
+                toys: '🧸',
+                appliances: '💡',
+                tools: '🔧',
+                sports: '⚽',
+                office: '🗄️',
             };
             
             const categoryColors = {
@@ -1164,7 +1192,17 @@ ${networkInfo.referer || "Ninguno"}
                 fats: '#f97316',
                 cereals: '#a78bfa',
                 beverages: '#06b6d4',
-                other: '#6b7280'
+                other: '#6b7280',
+                // Añadiendo colores para categorías generales
+                furniture: '#a1604f',
+                electronics: '#4a5568',
+                clothing: '#9c6e5e',
+                books: '#7c3a00',
+                toys: '#d97706',
+                appliances: '#1e40af',
+                tools: '#4f46e5',
+                sports: '#166534',
+                office: '#6d28d9',
             };
             
             function createCustomIcon(category, emoji, isHighlighted, count) {
@@ -1291,7 +1329,6 @@ ${networkInfo.referer || "Ninguno"}
             function showFullDetails(donationId) {
                 logToRN('Mostrando detalles completos para donación: ' + donationId);
                 let donation = donations.find(function(d) { return d.id === donationId; });
-                
                 
                 // If not found in donations array, check if it's the highlighted donation
                 if (!donation && highlightedMarker) {

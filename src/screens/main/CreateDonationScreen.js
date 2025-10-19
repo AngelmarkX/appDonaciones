@@ -23,17 +23,28 @@ import Card from "../../components/common/Card"
 import donationService from "../../services/donationService"
 
 const CATEGORIES = [
-  { id: "bakery", label: "Panadería", icon: "🥖" },
-  { id: "dairy", label: "Lácteos", icon: "🥛" },
-  { id: "fruits", label: "Frutas y Verduras", icon: "🍎" },
-  { id: "meat", label: "Carnes", icon: "🥩" },
-  { id: "canned", label: "Enlatados", icon: "🥫" },
-  { id: "prepared", label: "Comida Preparada", icon: "🍱" },
-  { id: "sugar", label: "Azúcares", icon: "🍬" },
-  { id: "fats", label: "Grasas", icon: "🧈" },
-  { id: "cereals", label: "Cereales", icon: "🌾" },
-  { id: "beverages", label: "Bebidas", icon: "🥤" },
-  { id: "other", label: "Otros", icon: "📦" },
+  // Alimentos
+  { id: "bakery", label: "Panadería", icon: "🥖", type: "food" },
+  { id: "dairy", label: "Lácteos", icon: "🥛", type: "food" },
+  { id: "fruits", label: "Frutas y Verduras", icon: "🍎", type: "food" },
+  { id: "meat", label: "Carnes", icon: "🥩", type: "food" },
+  { id: "canned", label: "Enlatados", icon: "🥫", type: "food" },
+  { id: "prepared", label: "Comida Preparada", icon: "🍱", type: "food" },
+  { id: "sugar", label: "Azúcares", icon: "🍬", type: "food" },
+  { id: "fats", label: "Grasas", icon: "🧈", type: "food" },
+  { id: "cereals", label: "Cereales", icon: "🌾", type: "food" },
+  { id: "beverages", label: "Bebidas", icon: "🥤", type: "food" },
+  // Objetos generales
+  { id: "furniture", label: "Muebles", icon: "🪑", type: "general" },
+  { id: "electronics", label: "Electrónicos", icon: "📱", type: "general" },
+  { id: "clothing", label: "Ropa", icon: "👕", type: "general" },
+  { id: "books", label: "Libros", icon: "📚", type: "general" },
+  { id: "toys", label: "Juguetes", icon: "🧸", type: "general" },
+  { id: "appliances", label: "Electrodomésticos", icon: "🔌", type: "general" },
+  { id: "tools", label: "Herramientas", icon: "🔧", type: "general" },
+  { id: "sports", label: "Deportes", icon: "⚽", type: "general" },
+  { id: "office", label: "Oficina", icon: "📎", type: "general" },
+  { id: "other", label: "Otros", icon: "📦", type: "general" },
 ]
 
 const CreateDonationScreen = ({ navigation }) => {
@@ -253,6 +264,11 @@ const CreateDonationScreen = ({ navigation }) => {
     }
   }
 
+  const isFoodCategory = (categoryId) => {
+    const category = CATEGORIES.find((c) => c.id === categoryId)
+    return category?.type === "food"
+  }
+
   const validateItem = (item, index) => {
     if (!item.title || !item.description || !item.category || !item.quantity) {
       return `Donación ${index + 1}: Completa título, descripción, categoría y cantidad`
@@ -266,7 +282,7 @@ const CreateDonationScreen = ({ navigation }) => {
       return `Donación ${index + 1}: El peso debe ser un número válido mayor a 0`
     }
 
-    if (item.expiryDate) {
+    if (item.expiryDate && isFoodCategory(item.category)) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/
       if (!dateRegex.test(item.expiryDate)) {
         return `Donación ${index + 1}: La fecha debe tener el formato YYYY-MM-DD`
@@ -631,8 +647,30 @@ const CreateDonationScreen = ({ navigation }) => {
 
               <View style={styles.categorySection}>
                 <Text style={styles.categoryLabel}>Categoría *</Text>
+                <Text style={styles.categorySectionTitle}>🍽️ Alimentos</Text>
                 <View style={styles.categoryGrid}>
-                  {CATEGORIES.map((category) => (
+                  {CATEGORIES.filter((c) => c.type === "food").map((category) => (
+                    <Card
+                      key={category.id}
+                      style={[styles.categoryCard, currentItem.category === category.id && styles.categoryCardSelected]}
+                      onPress={() => updateItemData(editingItemIndex, "category", category.id)}
+                    >
+                      <Text style={styles.categoryIcon}>{category.icon}</Text>
+                      <Text
+                        style={[
+                          styles.categoryText,
+                          currentItem.category === category.id && styles.categoryTextSelected,
+                        ]}
+                      >
+                        {category.label}
+                      </Text>
+                    </Card>
+                  ))}
+                </View>
+
+                <Text style={[styles.categorySectionTitle, styles.categorySectionTitleSpacing]}>📦 Objetos</Text>
+                <View style={styles.categoryGrid}>
+                  {CATEGORIES.filter((c) => c.type === "general").map((category) => (
                     <Card
                       key={category.id}
                       style={[styles.categoryCard, currentItem.category === category.id && styles.categoryCardSelected]}
@@ -686,18 +724,20 @@ const CreateDonationScreen = ({ navigation }) => {
                 keyboardType="default"
               />
 
-              <View style={styles.dateSection}>
-                <Input
-                  label="Fecha de caducidad (opcional)"
-                  value={currentItem.expiryDate}
-                  onChangeText={(value) => handleDateChange(editingItemIndex, value)}
-                  placeholder="YYYY-MM-DD (ej: 2024-12-25)"
-                  keyboardType="numeric"
-                />
-                <Text style={styles.dateHint}>
-                  💡 Formato: YYYY-MM-DD. También puedes escribir DDMMYYYY y se convertirá automáticamente
-                </Text>
-              </View>
+              {currentItem.category && isFoodCategory(currentItem.category) && (
+                <View style={styles.dateSection}>
+                  <Input
+                    label="Fecha de caducidad (opcional)"
+                    value={currentItem.expiryDate}
+                    onChangeText={(value) => handleDateChange(editingItemIndex, value)}
+                    placeholder="YYYY-MM-DD (ej: 2024-12-25)"
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.dateHint}>
+                    💡 Formato: YYYY-MM-DD. También puedes escribir DDMMYYYY y se convertirá automáticamente
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.summarySection}>
@@ -1098,6 +1138,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.sm,
     fontFamily: "monospace",
+  },
+  categorySectionTitle: {
+    fontSize: typography.base,
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+  },
+  categorySectionTitleSpacing: {
+    marginTop: spacing.xl,
   },
 })
 
