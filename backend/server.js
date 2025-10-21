@@ -3,6 +3,8 @@ const mysql = require("mysql2/promise")
 const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 const cors = require("cors")
+const crypto = require("crypto")
+const fetch = require("node-fetch") // Added for Mailjet API
 require("dotenv").config()
 
 const app = express()
@@ -99,6 +101,45 @@ const cleanDonation = (donation) => {
   }
 }
 
+const createEmailTransporter = async (toEmail, subject, htmlContent) => {
+  if (!process.env.MAILJET_API_KEY || !process.env.MAILJET_SECRET_KEY) {
+    console.warn("⚠️ Variables de Mailjet no configuradas. Los códigos se mostrarán en consola.")
+    return null
+  }
+
+  try {
+    const response = await fetch("https://api.mailjet.com/v3.1/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${Buffer.from(`${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`).toString("base64")}`,
+      },
+      body: JSON.stringify({
+        Messages: [
+          {
+            From: {
+              Email: process.env.MAILJET_FROM_EMAIL || "noreply@tuapp.com",
+              Name: "App Donaciones",
+            },
+            To: [
+              {
+                Email: toEmail,
+              },
+            ],
+            Subject: subject,
+            HTMLPart: htmlContent,
+          },
+        ],
+      }),
+    })
+
+    return response
+  } catch (error) {
+    console.error("Error enviando email con Mailjet:", error)
+    return null
+  }
+}
+
 // Rutas de autenticación
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -182,6 +223,137 @@ app.post("/api/auth/register", async (req, res) => {
     })
   } catch (error) {
     console.error("Error en registro:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+})
+
+// Solicitar recuperación de contraseña
+app.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({ error: "Email es requerido" })
+    }
+
+    const [users] = await pool.execute("SELECT id, email, name FROM users WHERE email = ?", [email])
+
+    if (!users || users.length === 0) {
+      return res.json({
+        message: "Si el email existe, recibirás un código de recuperación",
+      })
+    }
+
+    const user = users[0]
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
+
+    await pool.execute("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?", [
+      resetCode,
+      expiresAt,
+      user.id,
+    ])
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+          .code { background: #fff; border: 2px dashed #4CAF50; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Recuperación de Contraseña</h1>
+          </div>
+          <div class="content">
+            <p>Hola ${user.name},</p>
+            <p>Recibimos una solicitud para restablecer tu contraseña. Usa el siguiente código:</p>
+            <div class="code">${resetCode}</div>
+            <p><strong>Este código expira en 15 minutos.</strong></p>
+            <p>Si no solicitaste este cambio, ignora este mensaje.</p>
+          </div>
+          <div class="footer">
+            <p>App de Donaciones de Alimentos</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    const emailResponse = await createEmailTransporter(email, "Código de Recuperación de Contraseña", htmlContent)
+
+    if (emailResponse && emailResponse.ok) {
+      console.log("\n✅ Email enviado exitosamente a:", email)
+      res.json({ message: "Código de recuperación enviado a tu email" })
+    } else {
+      console.log("\n" + "=".repeat(60))
+      console.log("📧 CÓDIGO DE RECUPERACIÓN (Email falló)")
+      console.log("=".repeat(60))
+      console.log(`Usuario: ${user.name} (${email})`)
+      console.log(`Código: ${resetCode}`)
+      console.log(`Expira: ${expiresAt.toLocaleString()}`)
+      console.log("=".repeat(60) + "\n")
+
+      res.json({
+        message: "Código generado (revisa con el administrador)",
+        code: resetCode,
+        devMode: true,
+      })
+    }
+  } catch (error) {
+    console.error("Error en forgot-password:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+})
+
+// Restablecer contraseña con código
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: "Email, código y nueva contraseña son requeridos" })
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" })
+    }
+
+    const [users] = await pool.execute("SELECT id, reset_token, reset_token_expires FROM users WHERE email = ?", [
+      email,
+    ])
+
+    if (!users || users.length === 0) {
+      return res.status(400).json({ error: "Código inválido o expirado" })
+    }
+
+    const user = users[0]
+
+    if (!user.reset_token || user.reset_token !== code) {
+      return res.status(400).json({ error: "Código inválido o expirado" })
+    }
+
+    if (new Date() > new Date(user.reset_token_expires)) {
+      return res.status(400).json({ error: "Código expirado" })
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+    await pool.execute("UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?", [
+      hashedPassword,
+      user.id,
+    ])
+
+    res.json({ message: "Contraseña actualizada exitosamente" })
+  } catch (error) {
+    console.error("Error en reset-password:", error)
     res.status(500).json({ error: "Error interno del servidor" })
   }
 })

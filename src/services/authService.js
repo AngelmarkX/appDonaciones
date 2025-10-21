@@ -164,6 +164,58 @@ class AuthService {
 
     return headers
   }
+
+  async forgotPassword(email) {
+    try {
+      console.log("🔄 [AUTH] Solicitando recuperación para:", email)
+
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error solicitando recuperación")
+      }
+
+      console.log("✅ [AUTH] Código de recuperación enviado")
+      return data
+    } catch (error) {
+      console.error("❌ [AUTH] Error en forgot password:", error)
+      throw error
+    }
+  }
+
+  async resetPassword(email, code, newPassword) {
+    try {
+      console.log("🔄 [AUTH] Restableciendo contraseña para:", email)
+
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, code, newPassword }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error restableciendo contraseña")
+      }
+
+      console.log("✅ [AUTH] Contraseña restablecida exitosamente")
+      return data
+    } catch (error) {
+      console.error("❌ [AUTH] Error en reset password:", error)
+      throw error
+    }
+  }
 }
 
 export default new AuthService()

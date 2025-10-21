@@ -22,10 +22,9 @@ const MapScreenWebView = ({ route, navigation }) => {
   const [loading, setLoading] = useState(false)
   const [locationPermission, setLocationPermission] = useState(false)
   const [error, setError] = useState(null)
-  const [debugInfo, setDebugInfo] = useState("")
+  const [selectedDonation, setSelectedDonation] = useState(null)
   const [mapReady, setMapReady] = useState(false)
-  const [webViewLogs, setWebViewLogs] = useState([])
-  const [networkInfo, setNetworkInfo] = useState({})
+  const [networkInfo, setNetworkInfo] = useState(null) // State to store network info
   const highlightDonation = route?.params?.highlightDonation
 
   const getCategoryLabel = (category) => {
@@ -96,6 +95,12 @@ const MapScreenWebView = ({ route, navigation }) => {
     }
   }, [mapReady, userLocation, donations, highlightDonation, user])
 
+  useEffect(() => {
+    if (mapReady && donations.length > 0) {
+      sendMessageToWebView("UPDATE_DONATIONS", donations)
+    }
+  }, [mapReady, donations])
+
   const sendMessageToWebView = (type, data) => {
     if (webViewRef.current) {
       const message = { type, data }
@@ -155,7 +160,6 @@ const MapScreenWebView = ({ route, navigation }) => {
     try {
       setLoading(true)
       setError(null)
-      setDebugInfo("Cargando...")
 
       console.log("🔄 [MAP_WEBVIEW] Iniciando carga de donaciones...")
 
@@ -217,17 +221,14 @@ const MapScreenWebView = ({ route, navigation }) => {
 
         console.log("🎯 [MAP_WEBVIEW] Total donaciones procesadas:", processedDonations.length)
         setDonations(processedDonations)
-        setDebugInfo(`Cargadas: ${processedDonations.length} donaciones`)
       } else {
         console.warn("⚠️ [MAP_WEBVIEW] No hay donaciones o datos inválidos")
         setDonations([])
-        setDebugInfo("No hay donaciones")
       }
     } catch (error) {
       console.error("❌ [MAP_WEBVIEW] Error en loadDonations:", error)
       setError(error.message)
       setDonations([])
-      setDebugInfo(`Error: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -237,11 +238,6 @@ const MapScreenWebView = ({ route, navigation }) => {
     try {
       const message = JSON.parse(event.nativeEvent.data)
       console.log("📨 [MAP_WEBVIEW] Mensaje del WebView:", message)
-
-      setWebViewLogs((prev) => [
-        ...prev.slice(-4),
-        `${message.type}: ${JSON.stringify(message.data).substring(0, 50)}...`,
-      ])
 
       switch (message.type) {
         case "MAP_READY":
@@ -282,7 +278,7 @@ const MapScreenWebView = ({ route, navigation }) => {
 
         case "NETWORK_INFO":
           console.log("🌐 [MAP_WEBVIEW] Información de red recibida:", message.data)
-          setNetworkInfo(message.data)
+          setNetworkInfo(message.data) // Store network info
           break
 
         case "DONATION_HIGHLIGHTED":
@@ -292,6 +288,14 @@ const MapScreenWebView = ({ route, navigation }) => {
         case "LOCATION_GROUP_CLICKED":
           console.log("📍 [MAP_WEBVIEW] Grupo de ubicación clickeado:", message.data)
           handleLocationGroupClick(message.data)
+          break
+
+        case "POPUP_CLOSED":
+          setSelectedDonation(null)
+          break
+
+        case "UPDATE_DONATIONS":
+          // This case is handled in the useEffect hook
           break
 
         default:
@@ -431,48 +435,18 @@ const MapScreenWebView = ({ route, navigation }) => {
     loadDonations()
   }
 
-  const showDebugInfo = () => {
-    const networkDetails = networkInfo.userAgent
-      ? `User-Agent: ${networkInfo.userAgent.substring(0, 100)}...\nIP: ${networkInfo.ip || "No detectada"}\nReferer: ${
-          networkInfo.referer || "Ninguno"
-        }`
-      : "Información de red no disponible"
-
-    Alert.alert(
-      "🔍 Debug Info Completo",
-      `📊 DATOS:
-Donaciones: ${donations.length}
-Mapa listo: ${mapReady}
-Ubicación: ${userLocation ? "Sí" : "No"}
-Resaltar: ${highlightDonation ? highlightDonation.title : "Ninguna"}
-Usuario: ${user?.userType || "No detectado"}
-
-🌐 RED:
-${networkDetails}
-
-📝 LOGS:
-${webViewLogs.join("\n")}`,
-      [{ text: "OK" }],
-    )
-  }
-
+  // Function to display network info in an Alert
   const showNetworkInfo = () => {
-    Alert.alert(
-      "🌐 Tu 'Servidor' (Información de Red)",
-      `🔍 ESTO ES LO QUE VE OPENSTREETMAP:
-
-📱 User-Agent:
-${networkInfo.userAgent || "Cargando..."}
-
-🌍 IP Pública:
-${networkInfo.ip || "No detectada"}
-
-📡 Referer:
-${networkInfo.referer || "Ninguno"}
-
-⚠️ NOTA: Tu "servidor" es tu dispositivo móvil conectado a internet. OpenStreetMap ve estas requests como viniendo de tu IP.`,
-      [{ text: "Entendido" }],
-    )
+    if (networkInfo) {
+      let infoMessage = "Información de Red:\n\n"
+      infoMessage += `User Agent: ${networkInfo.userAgent || "N/A"}\n`
+      infoMessage += `Referer: ${networkInfo.referer || "N/A"}\n`
+      infoMessage += `IP Address: ${networkInfo.ip || "N/A"}\n`
+      infoMessage += `Timestamp: ${new Date(networkInfo.timestamp).toLocaleString()}`
+      Alert.alert("Detalles de Red", infoMessage)
+    } else {
+      Alert.Alert("Información de Red", "Aún no se ha recibido información de red.")
+    }
   }
 
   const mapHTML = `
@@ -487,7 +461,7 @@ ${networkInfo.referer || "Ninguno"}
             body { margin: 0; padding: 0; }
             #map { height: 100vh; width: 100vw; }
             
-            /* Added full details modal styling */
+            /* Reduced font sizes and spacing for more compact full details modal */
             .full-details-overlay {
                 position: fixed;
                 top: 0;
@@ -499,7 +473,7 @@ ${networkInfo.referer || "Ninguno"}
                 align-items: center;
                 justify-content: center;
                 z-index: 10000;
-                padding: 20px;
+                padding: 16px;
                 animation: fadeIn 0.3s ease;
             }
             
@@ -511,11 +485,11 @@ ${networkInfo.referer || "Ninguno"}
             .full-details-modal {
                 background: white;
                 border-radius: 16px;
-                max-width: 500px;
+                max-width: 420px;
                 width: 100%;
-                max-height: 85vh;
+                max-height: 90vh;
                 overflow-y: auto;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
                 animation: slideUp 0.3s ease;
             }
             
@@ -526,7 +500,7 @@ ${networkInfo.referer || "Ninguno"}
             
             .full-details-header {
                 background: linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%);
-                padding: 20px;
+                padding: 16px;
                 color: white;
                 border-radius: 16px 16px 0 0;
                 position: sticky;
@@ -536,15 +510,15 @@ ${networkInfo.referer || "Ninguno"}
             
             .full-details-close {
                 position: absolute;
-                top: 15px;
-                right: 15px;
+                top: 12px;
+                right: 12px;
                 background: rgba(255,255,255,0.2);
                 border: none;
                 color: white;
                 width: 32px;
                 height: 32px;
                 border-radius: 50%;
-                font-size: 20px;
+                font-size: 18px;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
@@ -558,18 +532,19 @@ ${networkInfo.referer || "Ninguno"}
             }
             
             .full-details-title {
-                font-size: 22px;
+                font-size: 17px;
                 font-weight: 700;
                 margin: 0 0 8px 0;
-                padding-right: 40px;
+                padding-right: 36px;
+                line-height: 1.3;
             }
             
             .full-details-category-badge {
                 background: rgba(255,255,255,0.25);
                 backdrop-filter: blur(10px);
-                padding: 6px 14px;
-                border-radius: 20px;
-                font-size: 13px;
+                padding: 6px 12px;
+                border-radius: 16px;
+                font-size: 12px;
                 font-weight: 600;
                 display: inline-flex;
                 align-items: center;
@@ -578,70 +553,102 @@ ${networkInfo.referer || "Ninguno"}
             }
             
             .full-details-body {
-                padding: 20px;
+                padding: 16px;
             }
             
             .full-details-section {
-                margin-bottom: 24px;
+                margin-bottom: 20px;
             }
             
             .full-details-section-title {
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 700;
                 color: #2E7D32;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
                 margin-bottom: 12px;
                 display: flex;
                 align-items: center;
                 gap: 8px;
+                padding-bottom: 6px;
+                border-bottom: 2px solid #e8f5e9;
             }
             
-            .full-details-grid {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 12px;
-            }
-            
-            .full-details-field {
+            .full-details-info-row {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 10px;
                 background: #f8f9fa;
-                padding: 12px;
                 border-radius: 10px;
+                margin-bottom: 8px;
                 border-left: 3px solid #4CAF50;
             }
             
-            .full-details-field-full {
-                grid-column: 1 / -1;
+            .full-details-info-icon {
+                font-size: 18px;
+                min-width: 24px;
+                text-align: center;
             }
             
-            .full-details-field-label {
-                font-size: 11px;
+            .full-details-info-content {
+                flex: 1;
+            }
+            
+            .full-details-info-label {
+                font-size: 10px;
                 font-weight: 600;
                 color: #666;
                 text-transform: uppercase;
-                letter-spacing: 0.3px;
-                margin-bottom: 4px;
-                display: flex;
-                align-items: center;
-                gap: 4px;
+                letter-spacing: 0.4px;
+                margin-bottom: 3px;
             }
             
-            .full-details-field-value {
-                font-size: 15px;
+            .full-details-info-value {
+                font-size: 13px;
                 color: #212529;
                 font-weight: 500;
+                line-height: 1.4;
+            }
+            
+            .full-details-stats-row {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 18px;
+            }
+            
+            .full-details-stat-card {
+                flex: 1;
+                background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+                border: 2px solid #2196f3;
+                border-radius: 12px;
+                padding: 14px;
+                text-align: center;
+            }
+            
+            .full-details-stat-value {
+                font-size: 22px;
+                font-weight: 700;
+                color: #1565c0;
+                display: block;
+                margin-bottom: 4px;
+            }
+            
+            .full-details-stat-label {
+                font-size: 10px;
+                color: #1976d2;
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+                font-weight: 600;
             }
             
             .full-details-description-box {
                 background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
                 border: 2px solid #ffc107;
                 border-radius: 12px;
-                padding: 16px;
-                margin-top: 12px;
+                padding: 14px;
             }
             
             .full-details-description-text {
-                font-size: 14px;
+                font-size: 12px;
                 color: #856404;
                 line-height: 1.6;
                 margin: 0;
@@ -655,56 +662,25 @@ ${networkInfo.referer || "Ninguno"}
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                margin-top: 12px;
+                margin-bottom: 16px;
             }
             
             .full-details-warning-icon {
-                font-size: 28px;
+                font-size: 26px;
             }
             
             .full-details-warning-text {
                 flex: 1;
-                font-size: 13px;
+                font-size: 12px;
                 color: #e65100;
                 font-weight: 600;
                 line-height: 1.4;
             }
             
-            .full-details-stats-row {
-                display: flex;
-                gap: 12px;
-                margin-bottom: 20px;
-            }
-            
-            .full-details-stat-card {
-                flex: 1;
-                background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-                border: 2px solid #2196f3;
-                border-radius: 12px;
-                padding: 16px;
-                text-align: center;
-            }
-            
-            .full-details-stat-value {
-                font-size: 24px;
-                font-weight: 700;
-                color: #1565c0;
-                display: block;
-                margin-bottom: 4px;
-            }
-            
-            .full-details-stat-label {
-                font-size: 11px;
-                color: #1976d2;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                font-weight: 600;
-            }
-            
             .full-details-buttons {
                 display: flex;
                 gap: 10px;
-                padding: 20px;
+                padding: 16px;
                 border-top: 2px solid #f0f0f0;
                 position: sticky;
                 bottom: 0;
@@ -714,10 +690,10 @@ ${networkInfo.referer || "Ninguno"}
             
             .full-details-button {
                 flex: 1;
-                padding: 14px;
+                padding: 12px;
                 border: none;
                 border-radius: 10px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
                 cursor: pointer;
                 transition: all 0.2s ease;
@@ -1310,7 +1286,7 @@ ${networkInfo.referer || "Ninguno"}
               let buttonsHTML = '';
               if (donation.id) {
                 buttonsHTML = '<div class="popup-buttons-container">';
-                buttonsHTML += '<button class="popup-button" onclick="showFullDetails(' + donation.id + ')"><span class="popup-button-icon">👁️</span> Ver Detalles Completos</button>';
+                buttonsHTML += '<button class="popup-button" onclick="showFullDetails(' + donation.id + ')">Ver Detalles Completos</button>';
                 
                 if (currentUserType === 'organization') {
                   buttonsHTML += '<button class="popup-button popup-button-reserve" onclick="reserveDonation(' + donation.id + ')"><span class="popup-button-icon">🎁</span> Reservar Donación</button>';
@@ -1330,7 +1306,6 @@ ${networkInfo.referer || "Ninguno"}
                 logToRN('Mostrando detalles completos para donación: ' + donationId);
                 let donation = donations.find(function(d) { return d.id === donationId; });
                 
-                // If not found in donations array, check if it's the highlighted donation
                 if (!donation && highlightedMarker) {
                     const highlightedLatLng = highlightedMarker.getLatLng();
                     donation = {
@@ -1338,11 +1313,7 @@ ${networkInfo.referer || "Ninguno"}
                         latitude: highlightedLatLng.lat,
                         longitude: highlightedLatLng.lng
                     };
-                    // Try to get full data from the marker's popup
-                    const popupContent = highlightedMarker.getPopup().getContent();
-                    // Extract data from popup if possible, or use what we have
                 }
-                // </CHANGE>
                 
                 if (!donation) {
                     logToRN('Donación no encontrada: ' + donationId);
@@ -1394,62 +1365,66 @@ ${networkInfo.referer || "Ninguno"}
                 }
                 
                 // Donor information section
-                modalHTML += '<div class="full-details-section">';
-                modalHTML += '<div class="full-details-section-title">👤 Información del Donante</div>';
-                modalHTML += '<div class="full-details-grid">';
-                
-                if (donation.donor_name) {
-                    modalHTML += '<div class="full-details-field full-details-field-full">';
-                    modalHTML += '<div class="full-details-field-label">👤 Nombre</div>';
-                    modalHTML += '<div class="full-details-field-value">' + donation.donor_name + '</div>';
+                if (donation.donor_name || donation.donor_phone || donation.contact_info) {
+                    modalHTML += '<div class="full-details-section">';
+                    modalHTML += '<div class="full-details-section-title">👤 Información del Donante</div>';
+                    
+                    if (donation.donor_name) {
+                        modalHTML += '<div class="full-details-info-row">';
+                        modalHTML += '<div class="full-details-info-icon">👤</div>';
+                        modalHTML += '<div class="full-details-info-content">';
+                        modalHTML += '<div class="full-details-info-label">Nombre</div>';
+                        modalHTML += '<div class="full-details-info-value">' + donation.donor_name + '</div>';
+                        modalHTML += '</div></div>';
+                    }
+                    
+                    if (donation.donor_phone || donation.contact_info) {
+                        const contact = donation.contact_info || donation.donor_phone;
+                        modalHTML += '<div class="full-details-info-row">';
+                        modalHTML += '<div class="full-details-info-icon">📞</div>';
+                        modalHTML += '<div class="full-details-info-content">';
+                        modalHTML += '<div class="full-details-info-label">Contacto</div>';
+                        modalHTML += '<div class="full-details-info-value">' + contact + '</div>';
+                        modalHTML += '</div></div>';
+                    }
+                    
                     modalHTML += '</div>';
                 }
-                
-                if (donation.donor_phone) {
-                    modalHTML += '<div class="full-details-field">';
-                    modalHTML += '<div class="full-details-field-label">📞 Teléfono</div>';
-                    modalHTML += '<div class="full-details-field-value">' + donation.donor_phone + '</div>';
-                    modalHTML += '</div>';
-                }
-                
-                if (donation.contact_info) {
-                    modalHTML += '<div class="full-details-field">';
-                    modalHTML += '<div class="full-details-field-label">📧 Contacto</div>';
-                    modalHTML += '<div class="full-details-field-value">' + donation.contact_info + '</div>';
-                    modalHTML += '</div>';
-                }
-                
-                modalHTML += '</div></div>';
                 
                 // Product details section
                 modalHTML += '<div class="full-details-section">';
                 modalHTML += '<div class="full-details-section-title">📦 Detalles del Producto</div>';
-                modalHTML += '<div class="full-details-grid">';
                 
                 if (formattedDate && !expiringSoon) {
-                    modalHTML += '<div class="full-details-field">';
-                    modalHTML += '<div class="full-details-field-label">📅 Fecha de Caducidad</div>';
-                    modalHTML += '<div class="full-details-field-value">' + formattedDate + '</div>';
-                    modalHTML += '</div>';
+                    modalHTML += '<div class="full-details-info-row">';
+                    modalHTML += '<div class="full-details-info-icon">📅</div>';
+                    modalHTML += '<div class="full-details-info-content">';
+                    modalHTML += '<div class="full-details-info-label">Fecha de Caducidad</div>';
+                    modalHTML += '<div class="full-details-info-value">' + formattedDate + '</div>';
+                    modalHTML += '</div></div>';
                 }
                 
                 if (donation.donation_reason) {
-                    modalHTML += '<div class="full-details-field full-details-field-full">';
-                    modalHTML += '<div class="full-details-field-label">💭 Razón de Donación</div>';
-                    modalHTML += '<div class="full-details-field-value">' + donation.donation_reason + '</div>';
-                    modalHTML += '</div>';
+                    modalHTML += '<div class="full-details-info-row">';
+                    modalHTML += '<div class="full-details-info-icon">💭</div>';
+                    modalHTML += '<div class="full-details-info-content">';
+                    modalHTML += '<div class="full-details-info-label">Razón de Donación</div>';
+                    modalHTML += '<div class="full-details-info-value">' + donation.donation_reason + '</div>';
+                    modalHTML += '</div></div>';
                 }
                 
-                modalHTML += '</div></div>';
+                modalHTML += '</div>';
                 
                 // Location section
                 if (donation.pickup_address) {
                     modalHTML += '<div class="full-details-section">';
                     modalHTML += '<div class="full-details-section-title">📍 Ubicación de Recogida</div>';
-                    modalHTML += '<div class="full-details-field full-details-field-full">';
-                    modalHTML += '<div class="full-details-field-label">📍 Dirección</div>';
-                    modalHTML += '<div class="full-details-field-value">' + donation.pickup_address + '</div>';
-                    modalHTML += '</div>';
+                    modalHTML += '<div class="full-details-info-row">';
+                    modalHTML += '<div class="full-details-info-icon">📍</div>';
+                    modalHTML += '<div class="full-details-info-content">';
+                    modalHTML += '<div class="full-details-info-label">Dirección</div>';
+                    modalHTML += '<div class="full-details-info-value">' + donation.pickup_address + '</div>';
+                    modalHTML += '</div></div>';
                     modalHTML += '</div>';
                 }
                 
@@ -1478,6 +1453,7 @@ ${networkInfo.referer || "Ninguno"}
                 modalHTML += '</div>';
                 
                 modalHTML += '</div></div>';
+                // </CHANGE>
                 
                 // Add modal to body
                 const modalContainer = document.createElement('div');
@@ -1813,8 +1789,11 @@ ${networkInfo.referer || "Ninguno"}
                         case 'HIGHLIGHT_DONATION':
                             highlightDonation(message.data);
                             break;
+                        case 'UPDATE_DONATIONS':
+                            updateDonations(message.data);
+                            break;
                         default:
-                            logToRN('Tipo de mensaje no reconocido: ' + message.type);
+                            logToRN('Mensaje desconocido: ' + message.type);
                     }
                 } catch (error) {
                     console.error('Error procesando mensaje:', error);
@@ -1858,9 +1837,6 @@ ${networkInfo.referer || "Ninguno"}
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.networkButton} onPress={showNetworkInfo}>
             <Ionicons name="globe-outline" size={20} color={colors.info} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.debugButton} onPress={showDebugInfo}>
-            <Ionicons name="bug" size={20} color={colors.secondary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.refreshButton} onPress={refreshMap}>
             <Ionicons name="refresh" size={20} color={colors.primary} />
@@ -1910,21 +1886,6 @@ ${networkInfo.referer || "Ninguno"}
           </View>
         )}
       </View>
-
-      <View style={styles.debugInfo}>
-        <Text style={styles.debugText}>
-          {debugInfo} | Mapa: {mapReady ? "✅" : "⏳"} | Ubicación: {userLocation ? "✅" : "❌"} | Donaciones:{" "}
-          {donations.length}
-        </Text>
-        {webViewLogs.length > 0 && (
-          <Text style={styles.webViewLogText}>WebView: {webViewLogs[webViewLogs.length - 1]}</Text>
-        )}
-        {networkInfo.ip && (
-          <Text style={styles.networkInfoText}>
-            🌐 Tu IP: {networkInfo.ip} | User-Agent: {networkInfo.userAgent?.substring(0, 30)}...
-          </Text>
-        )}
-      </View>
     </SafeAreaView>
   )
 }
@@ -1955,9 +1916,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   networkButton: {
-    padding: spacing.sm,
-  },
-  debugButton: {
     padding: spacing.sm,
   },
   refreshButton: {
@@ -2020,27 +1978,6 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: spacing.md,
-  },
-  debugInfo: {
-    backgroundColor: colors.black + "80",
-    padding: spacing.sm,
-  },
-  debugText: {
-    fontSize: typography.xs,
-    color: colors.white,
-    textAlign: "center",
-  },
-  webViewLogText: {
-    fontSize: 10,
-    color: colors.yellow,
-    textAlign: "center",
-    marginTop: 2,
-  },
-  networkInfoText: {
-    fontSize: 9,
-    color: colors.info,
-    textAlign: "center",
-    marginTop: 2,
   },
 })
 
