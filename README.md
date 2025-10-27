@@ -1,202 +1,413 @@
-# Food Donation App
+# App Móvil - Sistema de Donación de Alimentos
 
-Una aplicación móvil desarrollada con React Native y Expo que conecta donantes de alimentos con organizaciones benéficas para reducir el desperdicio de alimentos.
+Aplicación móvil para iOS y Android que conecta donantes de alimentos con organizaciones benéficas, construida con React Native y Expo.
 
-## 🚀 Características
+## Descripción
 
-- **Autenticación completa** con JWT
-- **Dashboard personalizado** según tipo de usuario (donante/organización)
-- **Gestión de donaciones** con categorías y estados
-- **Base de datos MySQL** con estructura completa
-- **API REST** con Node.js y Express
-- **Interfaz intuitiva** con componentes reutilizables
-- **Notificaciones** en tiempo real
-- **Navegación fluida** con React Navigation
+Aplicación móvil que permite a usuarios donar alimentos excedentes y a organizaciones benéficas encontrar y reservar donaciones disponibles. Incluye mapa interactivo, gestión de perfil, notificaciones y sistema de reservas en tiempo real.
 
-## 📱 Funcionalidades
+## Características
 
-### Para Donantes
-- Crear nuevas donaciones
-- Ver historial de donaciones
-- Gestionar estado de donaciones
-- Estadísticas personales
+- Registro e inicio de sesión con autenticación JWT
+- Dos tipos de usuarios: Donantes y Organizaciones
+- Publicación de donaciones con ubicación en mapa
+- Búsqueda y filtrado de donaciones disponibles
+- Reserva y gestión de donaciones
+- Mapa interactivo con Leaflet
+- Perfil de usuario editable
+- Notificaciones push
+- Recuperación de contraseña por email
+- Dashboard con estadísticas
 
-### Para Organizaciones
-- Explorar donaciones disponibles
-- Ver donaciones en mapa
+## Tecnologías
+
+- **React Native** - Framework móvil
+- **Expo** v51 - Plataforma de desarrollo
+- **React Navigation** v6 - Navegación
+- **Leaflet** - Mapas interactivos
+- **Expo Location** - Geolocalización
+- **AsyncStorage** - Almacenamiento local
+- **Axios** - Cliente HTTP
+
+## Requisitos Previos
+
+- Node.js v14 o superior
+- npm o yarn
+- Expo CLI: `npm install -g expo-cli`
+- Expo Go app en tu dispositivo móvil (para testing)
+- Android Studio (para emulador Android) o Xcode (para simulador iOS)
+
+## Instalación
+
+1. Clona el repositorio:
+\`\`\`bash
+git clone <url-del-repositorio>
+cd appDonaciones
+\`\`\`
+
+2. Instala las dependencias:
+\`\`\`bash
+npm install
+\`\`\`
+
+3. Configura la URL del backend en `src/config/api.js`:
+\`\`\`javascript
+export const API_CONFIG = {
+  // Desarrollo local
+  DEV_URL: 'http://192.168.1.5:3000',
+  
+  // Producción
+  PROD_URL: 'https://tu-backend.railway.app',
+}
+\`\`\`
+
+## Ejecutar la Aplicación
+
+### Modo Desarrollo
+
+\`\`\`bash
+# Iniciar Expo
+npm start
+
+# O específicamente para cada plataforma
+npm run android  # Android
+npm run ios      # iOS
+npm run web      # Web (experimental)
+\`\`\`
+
+Escanea el código QR con:
+- **iOS**: Cámara del iPhone
+- **Android**: App Expo Go
+
+### Emuladores
+
+**Android:**
+\`\`\`bash
+npm run android
+\`\`\`
+Requiere Android Studio instalado
+
+**iOS (solo macOS):**
+\`\`\`bash
+npm run ios
+\`\`\`
+Requiere Xcode instalado
+
+## Estructura del Proyecto
+
+\`\`\`
+appDonaciones/
+├── src/
+│   ├── components/        # Componentes reutilizables
+│   │   ├── DonationCard.js
+│   │   └── LoadingSpinner.js
+│   ├── contexts/          # Context API
+│   │   └── AuthContext.js
+│   ├── navigation/        # Configuración de navegación
+│   │   ├── AppNavigator.js
+│   │   ├── AuthNavigator.js
+│   │   └── MainNavigator.js
+│   ├── screens/           # Pantallas de la app
+│   │   ├── auth/          # Pantallas de autenticación
+│   │   │   ├── LoginScreen.js
+│   │   │   ├── RegisterScreen.js
+│   │   │   ├── ForgotPasswordScreen.js
+│   │   │   └── ChangePasswordScreen.js
+│   │   └── main/          # Pantallas principales
+│   │       ├── DashboardScreen.js
+│   │       ├── MapScreenWebView.js
+│   │       ├── CreateDonationScreen.js
+│   │       ├── ProfileScreen.js
+│   │       ├── EditProfileScreen.js
+│   │       ├── NotificationsScreen.js
+│   │       └── HelpSupportScreen.js
+│   ├── services/          # Servicios y API
+│   │   ├── api.js
+│   │   ├── authService.js
+│   │   └── donationService.js
+│   ├── config/            # Configuración
+│   │   └── api.js
+│   └── utils/             # Utilidades
+│       └── colors.js
+├── assets/                # Recursos estáticos
+│   ├── icon.png
+│   ├── splash.png
+│   └── adaptive-icon.png
+├── app.json              # Configuración de Expo
+├── package.json          # Dependencias
+└── README.md            # Esta documentación
+\`\`\`
+
+## Configuración
+
+### API Backend
+
+Edita `src/config/api.js`:
+
+\`\`\`javascript
+export const API_CONFIG = {
+  DEV_URL: 'http://TU_IP_LOCAL:3000',
+  PROD_URL: 'https://tu-backend-produccion.com',
+}
+
+// Forzar modo producción para testing
+export const FORCE_PRODUCTION = false
+\`\`\`
+
+### Colores y Tema
+
+Edita `src/utils/colors.js`:
+
+\`\`\`javascript
+export const colors = {
+  primary: '#4CAF50',
+  secondary: '#2196F3',
+  // ... más colores
+}
+\`\`\`
+
+## Tipos de Usuario
+
+### Donante (donor)
+- Publicar donaciones
+- Ver donaciones publicadas
+- Gestionar donaciones activas
+- Ver estadísticas de impacto
+
+### Organización (organization)
+- Buscar donaciones disponibles
 - Reservar donaciones
-- Contactar donantes
+- Ver donaciones recibidas
+- Configurar días de recolección
+- Ver estadísticas de donaciones recibidas
 
-## 🛠️ Tecnologías
+## Flujo de la Aplicación
 
-### Frontend (React Native)
-- **React Native** con Expo
-- **React Navigation** para navegación
-- **Context API** para gestión de estado
-- **Axios** para llamadas HTTP
-- **Expo Vector Icons** para iconografía
+1. **Registro/Login** → Usuario crea cuenta o inicia sesión
+2. **Dashboard** → Vista principal con estadísticas
+3. **Mapa** → Visualización de donaciones disponibles
+4. **Crear Donación** (Donantes) → Publicar nueva donación
+5. **Reservar** (Organizaciones) → Reservar donación disponible
+6. **Perfil** → Gestionar información personal
 
-### Backend (Node.js)
-- **Express.js** como framework web
-- **MySQL** como base de datos
-- **JWT** para autenticación
-- **bcrypt** para encriptación de contraseñas
-- **CORS** para manejo de peticiones cross-origin
+## Navegación
 
-## 📦 Instalación
+La app usa React Navigation con tres navegadores:
 
-### Prerrequisitos
-- Node.js (v14 o superior)
-- MySQL Server
-- Expo CLI
-- Dispositivo móvil con Expo Go o emulador
+1. **AppNavigator** - Navegador raíz
+2. **AuthNavigator** - Pantallas de autenticación (Stack)
+3. **MainNavigator** - Pantallas principales (Bottom Tabs)
 
-### 1. Configurar Base de Datos
+### Tabs Principales
+
+- **Dashboard** - Vista general y estadísticas
+- **Mapa** - Mapa interactivo con donaciones
+- **Nueva Donación** - Crear donación (solo donantes)
+- **Perfil** - Perfil de usuario
+
+## Servicios
+
+### authService.js
+Maneja autenticación y gestión de tokens:
+- `login(email, password)`
+- `register(userData)`
+- `logout()`
+- `getToken()`
+- `getUser()`
+
+### donationService.js
+Maneja operaciones de donaciones:
+- `createDonation(donationData)`
+- `getDonations(filters)`
+- `reserveDonation(id)`
+- `completeDonation(id)`
+- `cancelReservation(id)`
+
+### api.js
+Cliente HTTP configurado con interceptores para:
+- Agregar token JWT automáticamente
+- Manejar errores de red
+- Timeout de 30 segundos
+
+## Permisos
+
+La app requiere los siguientes permisos:
+
+- **Ubicación** - Para mostrar ubicación en el mapa
+- **Notificaciones** - Para recibir alertas (opcional)
+
+## Build para Producción
+
+### Android (APK)
+
 \`\`\`bash
-# Instalar MySQL y ejecutar el script
-mysql -u root -p < database/food_donation_db.sql
+# Build APK
+expo build:android
+
+# O con EAS (recomendado)
+eas build --platform android
 \`\`\`
 
-### 2. Configurar Backend
+### iOS (IPA)
+
 \`\`\`bash
-# Navegar a la carpeta backend
-cd backend
+# Build IPA
+expo build:ios
 
-# Instalar dependencias
-npm install
-
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales de MySQL
-
-# Iniciar servidor
-npm start
+# O con EAS (recomendado)
+eas build --platform ios
 \`\`\`
 
-### 3. Configurar Frontend
+### Configuración EAS
+
+1. Instala EAS CLI:
 \`\`\`bash
-# Instalar dependencias
-npm install
-
-# Actualizar IP del servidor en los servicios
-# Editar src/services/authService.js y src/services/donationService.js
-# Cambiar 'http://192.168.1.100:3000' por tu IP local
-
-# Iniciar aplicación
-npm start
+npm install -g eas-cli
 \`\`\`
 
-## 🔧 Configuración
-
-### Variables de Entorno (Backend)
-\`\`\`env
-PORT=3000
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=tu_password
-DB_NAME=food_donation_db
-JWT_SECRET=tu_jwt_secret
+2. Configura el proyecto:
+\`\`\`bash
+eas build:configure
 \`\`\`
 
-### Configuración de IP
-Actualiza la IP en los archivos de servicios:
-- `src/services/authService.js`
-- `src/services/donationService.js`
+3. Build:
+\`\`\`bash
+eas build --platform all
+\`\`\`
 
-Cambia `192.168.1.100` por tu IP local.
+## Publicación
 
-## 📊 Estructura de Base de Datos
+### Google Play Store
 
-### Tablas Principales
-- **users**: Información de usuarios (donantes y organizaciones)
-- **donations**: Donaciones con detalles y estado
-- **notifications**: Sistema de notificaciones
-- **donation_history**: Historial de cambios en donaciones
+1. Genera APK/AAB firmado
+2. Crea cuenta de desarrollador ($25 único pago)
+3. Sube el APK/AAB
+4. Completa la información de la app
+5. Publica
 
-## 🎯 Uso
+### Apple App Store
 
-### Registro y Login
-1. Abre la aplicación
-2. Selecciona "Comenzar" para registrarte
-3. Elige tu tipo de usuario (Donante u Organización)
-4. Completa el formulario de registro
-5. Inicia sesión con tus credenciales
+1. Genera IPA firmado
+2. Crea cuenta de desarrollador ($99/año)
+3. Sube el IPA con Transporter
+4. Completa la información en App Store Connect
+5. Envía para revisión
 
-### Crear Donación (Donantes)
-1. Ve al Dashboard
-2. Toca "Nueva Donación"
-3. Completa la información de la donación
-4. Selecciona categoría y cantidad
-5. Añade dirección de recogida
-6. Confirma la creación
+## Testing
 
-### Explorar Donaciones (Organizaciones)
-1. Ve a la pestaña "Mapa"
-2. Explora donaciones disponibles
-3. Ve detalles de cada donación
-4. Contacta al donante si es necesario
+### Testing Manual
 
-## 🔄 Estados de Donación
+1. Inicia la app en Expo Go
+2. Prueba cada flujo:
+   - Registro de usuario
+   - Login
+   - Crear donación
+   - Reservar donación
+   - Editar perfil
+   - Recuperar contraseña
 
-- **available**: Disponible para reservar
-- **reserved**: Reservada por una organización
-- **completed**: Donación completada
-- **expired**: Donación expirada
+### Testing en Dispositivos
 
-## 🎨 Componentes Reutilizables
+**Android:**
+- Instala Expo Go desde Play Store
+- Escanea el QR code
 
-- **Button**: Botón personalizable con variantes
-- **Input**: Campo de entrada con validación
-- **Card**: Contenedor con sombra y padding
-- **Badge**: Etiqueta de estado con colores
+**iOS:**
+- Instala Expo Go desde App Store
+- Escanea el QR code con la cámara
 
-## 📱 Navegación
+## Troubleshooting
 
-### Stack de Autenticación
-- Welcome Screen
-- Login Screen
-- Register Screen
-- Forgot Password Screen
+### Error: "Network request failed"
+- Verifica que el backend esté corriendo
+- Verifica la URL en `src/config/api.js`
+- Asegúrate de estar en la misma red (desarrollo local)
 
-### Stack Principal (Tabs)
-- Dashboard
-- Map
-- Donations
-- Profile
+### Error: "Unable to resolve module"
+- Limpia caché: `expo start -c`
+- Reinstala dependencias: `rm -rf node_modules && npm install`
 
-## 🚀 Próximas Características
+### Mapa no carga
+- Verifica conexión a internet
+- Revisa permisos de ubicación
+- Verifica que Leaflet esté cargando correctamente
 
-- [ ] Mapas interactivos con geolocalización
-- [ ] Notificaciones push con Firebase
-- [ ] Chat entre donantes y organizaciones
-- [ ] Sistema de calificaciones
-- [ ] Filtros avanzados de búsqueda
-- [ ] Modo oscuro
-- [ ] Compartir donaciones en redes sociales
+### App muy lenta
+- Habilita Hermes en `app.json`
+- Optimiza imágenes
+- Reduce dependencias no usadas
 
-## 🤝 Contribuir
+## Optimización
+
+### Reducir Tamaño
+
+1. Habilita Hermes:
+\`\`\`json
+{
+  "expo": {
+    "jsEngine": "hermes"
+  }
+}
+\`\`\`
+
+2. Optimiza imágenes:
+\`\`\`bash
+# Instala imagemin
+npm install -g imagemin-cli
+
+# Optimiza imágenes
+imagemin assets/*.png --out-dir=assets/optimized
+\`\`\`
+
+3. Analiza bundle:
+\`\`\`bash
+npx react-native-bundle-visualizer
+\`\`\`
+
+### Mejorar Performance
+
+- Usa `React.memo()` para componentes
+- Implementa `useMemo()` y `useCallback()`
+- Lazy loading de pantallas
+- Optimiza re-renders
+
+## Variables de Entorno
+
+Para producción, configura:
+
+\`\`\`javascript
+// src/config/api.js
+export const API_CONFIG = {
+  PROD_URL: process.env.EXPO_PUBLIC_API_URL || 'https://default-url.com',
+}
+\`\`\`
+
+## Logs y Debugging
+
+La app incluye logs detallados:
+- `[AUTH]` - Autenticación
+- `[API]` - Llamadas API
+- `[DONATION]` - Operaciones de donaciones
+- `[MAP]` - Operaciones del mapa
+- `[LOCATION]` - Geolocalización
+
+
+## Contribuir
 
 1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+2. Crea una rama (`git checkout -b feature/AmazingFeature`)
 3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
 4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
 
-## 📄 Licencia
+## Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
+Este proyecto no tiene licencia definida actualmente. Todos los derechos reservados.
 
-## 📞 Soporte
+## Soporte
 
-Si tienes problemas o preguntas:
-1. Revisa la documentación
-2. Verifica la configuración de IP y base de datos
-3. Asegúrate de que el backend esté ejecutándose
-4. Verifica que Expo Go esté actualizado
+Para reportar bugs o solicitar features, abre un issue en el repositorio.
 
-## 🙏 Agradecimientos
+## Contacto
 
-- Expo team por la excelente plataforma
-- React Navigation por la navegación fluida
-- MySQL por la base de datos robusta
-- Toda la comunidad de React Native
+Para más información sobre el proyecto, consulta la documentación técnica o contacta al equipo de desarrollo.
