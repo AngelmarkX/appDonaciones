@@ -93,51 +93,51 @@ npm run ios
 \`\`\`
 Requiere Xcode instalado
 
-## Estructura del Proyecto
+## 🧱 Estructura del Proyecto
 
-\`\`\`
+```bash
 appDonaciones/
 ├── src/
-│   ├── components/        # Componentes reutilizables
+│   ├── components/        # 🧩 Componentes reutilizables
 │   │   ├── DonationCard.js
 │   │   └── LoadingSpinner.js
-│   ├── contexts/          # Context API
+│   ├── contexts/          # ⚙️ Context API
 │   │   └── AuthContext.js
-│   ├── navigation/        # Configuración de navegación
+│   ├── navigation/        # 🧭 Configuración de navegación
 │   │   ├── AppNavigator.js
 │   │   ├── AuthNavigator.js
 │   │   └── MainNavigator.js
-│   ├── screens/           # Pantallas de la app
-│   │   ├── auth/          # Pantallas de autenticación
+│   ├── screens/           # 📱 Pantallas de la app
+│   │   ├── auth/          # 🔐 Pantallas de autenticación
 │   │   │   ├── LoginScreen.js
 │   │   │   ├── RegisterScreen.js
 │   │   │   ├── ForgotPasswordScreen.js
 │   │   │   └── ChangePasswordScreen.js
-│   │   └── main/          # Pantallas principales
+│   │   └── main/          # 🧭 Pantallas principales
 │   │       ├── DashboardScreen.js
 │   │       ├── MapScreenWebView.js
 │   │       ├── CreateDonationScreen.js
 │   │       ├── ProfileScreen.js
 │   │       ├── EditProfileScreen.js
 │   │       ├── NotificationsScreen.js
+│   │       ├── DonationDaysScreen.js
 │   │       └── HelpSupportScreen.js
-│   ├── services/          # Servicios y API
+│   ├── services/          # 🌐 Servicios y API
 │   │   ├── api.js
 │   │   ├── authService.js
 │   │   └── donationService.js
-│   ├── config/            # Configuración
+│   ├── config/            # ⚙️ Configuración
 │   │   └── api.js
-│   └── utils/             # Utilidades
+│   └── utils/             # 🧮 Utilidades
 │       └── colors.js
-├── assets/                # Recursos estáticos
+├── assets/                # 🖼️ Recursos estáticos
 │   ├── icon.png
 │   ├── splash.png
 │   └── adaptive-icon.png
-├── app.json              # Configuración de Expo
-├── package.json          # Dependencias
-└── README.md            # Esta documentación
-\`\`\`
-
+├── app.json               # ⚙️ Configuración de Expo
+├── package.json           # 📦 Dependencias
+└── README.md              # 📝 Esta documentación
+```
 ## Configuración
 
 ### API Backend
