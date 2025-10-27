@@ -10,10 +10,9 @@ const AboutScreen = ({ navigation }) => {
   }
 
   const teamMembers = [
-    { name: "Ana García", role: "CEO & Fundadora", icon: "person" },
-    { name: "Carlos López", role: "CTO", icon: "code-slash" },
-    { name: "María Rodríguez", role: "Diseñadora UX", icon: "color-palette" },
-    { name: "Juan Pérez", role: "Desarrollador", icon: "laptop" },
+    { name: "Miguel Zuluaga", role: "Desarollador", icon: "person" },
+    { name: "Santiago Guevara", role: "Desarrollador", icon: "person" },
+
   ]
 
   const stats = [
@@ -54,18 +53,7 @@ const AboutScreen = ({ navigation }) => {
           </Text>
         </Card>
 
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>📊 Nuestro Impacto</Text>
-          <View style={styles.statsGrid}>
-            {stats.map((stat, index) => (
-              <View key={index} style={styles.statItem}>
-                <Ionicons name={stat.icon} size={24} color={colors.primary} />
-                <Text style={styles.statNumber}>{stat.number}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
-          </View>
-        </Card>
+
 
         <Card style={styles.section}>
           <Text style={styles.sectionTitle}>👥 Nuestro Equipo</Text>

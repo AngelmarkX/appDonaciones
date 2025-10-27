@@ -361,6 +361,67 @@ const CreateDonationScreen = ({ navigation }) => {
     }
   }
 
+  const useCurrentLocation = async () => {
+    try {
+      setLoading(true)
+      const { status } = await Location.requestForegroundPermissionsAsync()
+
+      if (status !== "granted") {
+        Alert.alert("Permiso denegado", "Necesitamos acceso a tu ubicación para usar esta función")
+        setLoading(false)
+        return
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      })
+
+      const lat = Number.parseFloat(location.coords.latitude.toFixed(6))
+      const lng = Number.parseFloat(location.coords.longitude.toFixed(6))
+
+      let address = `Lat: ${lat}, Lng: ${lng}`
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              "User-Agent": "FoodDonationApp/1.0",
+            },
+          },
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data?.display_name) {
+            address = data.display_name
+          }
+        } else {
+          console.log("⚠️ [CREATE_DONATION] API de geocodificación no disponible, usando coordenadas")
+        }
+      } catch (geocodeError) {
+        console.log("⚠️ [CREATE_DONATION] Error en geocodificación, usando coordenadas:", geocodeError.message)
+      }
+
+      const currentLocation = {
+        latitude: lat,
+        longitude: lng,
+        address: address,
+      }
+
+      console.log("📍 [CREATE_DONATION] Ubicación actual seleccionada:", currentLocation)
+      setSelectedLocation(currentLocation)
+      setShowMap(false)
+      setLoading(false)
+
+      Alert.alert("Ubicación seleccionada", "Se ha seleccionado tu ubicación actual")
+    } catch (error) {
+      console.error("❌ [CREATE_DONATION] Error obteniendo ubicación actual:", error)
+      Alert.alert("Error", "No se pudo obtener tu ubicación actual. Intenta seleccionarla en el mapa.")
+      setLoading(false)
+    }
+  }
+
   const locationMapHTML = `
     <!DOCTYPE html>
     <html>
@@ -791,6 +852,15 @@ const CreateDonationScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.mapActionsContainer}>
+              <TouchableOpacity style={styles.currentLocationButton} onPress={useCurrentLocation} disabled={loading}>
+                <Ionicons name="locate" size={20} color={colors.white} />
+                <Text style={styles.currentLocationText}>
+                  {loading ? "Obteniendo ubicación..." : "Usar mi ubicación actual"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <WebView
               ref={mapWebViewRef}
               source={{ html: locationMapHTML }}
@@ -1148,6 +1218,26 @@ const styles = StyleSheet.create({
   },
   categorySectionTitleSpacing: {
     marginTop: spacing.xl,
+  },
+  mapActionsContainer: {
+    padding: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  currentLocationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    gap: spacing.sm,
+  },
+  currentLocationText: {
+    fontSize: typography.base,
+    color: colors.white,
+    fontWeight: typography.medium,
   },
 })
 

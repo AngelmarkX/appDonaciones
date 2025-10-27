@@ -34,6 +34,14 @@ const RegisterScreen = ({ navigation }) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
+  const handlePhoneChange = (value) => {
+    // Remover cualquier carácter que no sea número
+    const numbers = value.replace(/[^\d]/g, "")
+    // Limitar a 10 dígitos después del código de país
+    const limitedNumbers = numbers.slice(0, 10)
+    updateFormData("phone", limitedNumbers)
+  }
+
   const handleRegister = async () => {
     const { name, email, password, confirmPassword, phone, userType, address } = formData
 
@@ -52,13 +60,15 @@ const RegisterScreen = ({ navigation }) => {
       return
     }
 
+    const phoneWithCountryCode = `+57${phone}`
+
     try {
       setLoading(true)
       await register({
         name,
         email,
         password,
-        phone,
+        phone: phoneWithCountryCode,
         userType,
         address,
       })
@@ -95,13 +105,23 @@ const RegisterScreen = ({ navigation }) => {
               placeholder="tu@email.com"
             />
 
-            <Input
-              label="Teléfono"
-              value={formData.phone}
-              onChangeText={(value) => updateFormData("phone", value)}
-              keyboardType="phone-pad"
-              placeholder="+34 123 456 789"
-            />
+            <View style={styles.phoneContainer}>
+              <Text style={styles.phoneLabel}>Teléfono</Text>
+              <View style={styles.phoneInputContainer}>
+                <View style={styles.countryCodeContainer}>
+                  <Text style={styles.flagEmoji}>🇨🇴</Text>
+                  <Text style={styles.countryCode}>+57</Text>
+                </View>
+                <Input
+                  value={formData.phone}
+                  onChangeText={handlePhoneChange}
+                  keyboardType="phone-pad"
+                  placeholder="3001234567"
+                  style={styles.phoneInput}
+                  maxLength={10}
+                />
+              </View>
+            </View>
 
             <View style={styles.userTypeContainer}>
               <Text style={styles.userTypeLabel}>Tipo de usuario</Text>
@@ -257,6 +277,43 @@ const styles = StyleSheet.create({
   footerLink: {
     color: colors.primary,
     fontWeight: typography.medium,
+  },
+  phoneContainer: {
+    marginBottom: spacing.lg,
+  },
+  phoneLabel: {
+    fontSize: typography.base,
+    fontWeight: typography.medium,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  phoneInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  countryCodeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  flagEmoji: {
+    fontSize: 20,
+  },
+  countryCode: {
+    fontSize: typography.base,
+    fontWeight: typography.medium,
+    color: colors.textPrimary,
+  },
+  phoneInput: {
+    flex: 1,
+    marginBottom: 0,
   },
 })
 

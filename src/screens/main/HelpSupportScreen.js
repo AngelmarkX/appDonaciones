@@ -49,27 +49,22 @@ const HelpSupportScreen = ({ navigation }) => {
     {
       icon: "mail-outline",
       title: "Email",
-      subtitle: "soporte@foodshare.com",
-      action: () => handleContact("email", "soporte@foodshare.com"),
+      subtitle: "miguel.zuluaga@ucp.edu.co",
+      action: () => handleContact("email", "miguel.zuluaga@ucp.edu.co"),
     },
     {
       icon: "call-outline",
       title: "Teléfono",
-      subtitle: "+57 1 234 5678",
-      action: () => handleContact("phone", "+5712345678"),
+      subtitle: "+57 3206775293",
+      action: () => handleContact("phone", "+57 3206775293"),
     },
     {
       icon: "logo-whatsapp",
       title: "WhatsApp",
-      subtitle: "+57 300 123 4567",
-      action: () => handleContact("whatsapp", "+573001234567"),
+      subtitle: "+57 3206775293",
+      action: () => handleContact("whatsapp", "++57 3206775293"),
     },
-    {
-      icon: "chatbubble-outline",
-      title: "Chat en vivo",
-      subtitle: "Disponible 9AM - 6PM",
-      action: () => Alert.alert("Próximamente", "El chat en vivo estará disponible pronto"),
-    },
+ 
   ]
 
   return (
@@ -111,36 +106,7 @@ const HelpSupportScreen = ({ navigation }) => {
           ))}
         </Card>
 
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>📚 Recursos Útiles</Text>
-
-          <TouchableOpacity style={styles.resourceItem}>
-            <Ionicons name="document-text-outline" size={24} color={colors.primary} />
-            <View style={styles.resourceText}>
-              <Text style={styles.resourceTitle}>Guía de Usuario</Text>
-              <Text style={styles.resourceSubtitle}>Aprende a usar todas las funciones</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.resourceItem}>
-            <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
-            <View style={styles.resourceText}>
-              <Text style={styles.resourceTitle}>Políticas de Seguridad</Text>
-              <Text style={styles.resourceSubtitle}>Conoce nuestras medidas de seguridad</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.resourceItem}>
-            <Ionicons name="videocam-outline" size={24} color={colors.primary} />
-            <View style={styles.resourceText}>
-              <Text style={styles.resourceTitle}>Tutoriales en Video</Text>
-              <Text style={styles.resourceSubtitle}>Videos paso a paso</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </Card>
+        
 
         <Card style={styles.emergencyCard}>
           <Ionicons name="warning-outline" size={24} color={colors.error} />
@@ -150,7 +116,7 @@ const HelpSupportScreen = ({ navigation }) => {
               Si tienes un problema urgente relacionado con seguridad alimentaria o una emergencia, contacta
               inmediatamente a nuestro equipo de soporte.
             </Text>
-            <TouchableOpacity style={styles.emergencyButton} onPress={() => handleContact("phone", "+5712345678")}>
+            <TouchableOpacity style={styles.emergencyButton} onPress={() => handleContact("phone", "+57 3206775293")}>
               <Text style={styles.emergencyButtonText}>Llamar Ahora</Text>
             </TouchableOpacity>
           </View>

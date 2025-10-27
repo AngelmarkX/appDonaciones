@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Food Donation App",
+    "name": "FoodShare",
     "slug": "food-donation-app",
-    "version": "1.0.1",
+    "version": "1.1.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -44,8 +44,8 @@
         {
           "android": {
             "useProguard": true,
-            "useExpoBuildProperties": true,
-            "usesCleartextTraffic": true
+            "useExpoBuildProperties": true
+   
           }
         }
       ]

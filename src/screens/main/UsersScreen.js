@@ -7,7 +7,7 @@ import { colors, spacing } from "../../styles"
 import axios from "axios"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
-const API_URL = "http://192.168.1.5:3006/api"
+const API_URL = "https://backend-production-b28f.up.railway.app/api"
 
 const UsersScreen = () => {
   const [users, setUsers] = useState([])

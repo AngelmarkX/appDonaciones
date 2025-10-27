@@ -1,6 +1,6 @@
 import authService from "./authService"
 
-const API_BASE_URL = "http://192.168.1.5:3006/api"
+const API_BASE_URL = "https://backend-production-b28f.up.railway.app/api"
 
 class DonationService {
   async getDonations(filters = {}) {

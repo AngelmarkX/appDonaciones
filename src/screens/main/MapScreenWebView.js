@@ -1607,7 +1607,7 @@ const MapScreenWebView = ({ route, navigation }) => {
                         })
                     }).addTo(map);
                     
-                    userMarker.bindPopup('<div class="custom-popup"><div class="popup-title">Tu ubicación</div></div>');
+                    // userMarker.bindPopup('<div class="custom-popup"><div class="popup-title">Tu ubicación</div></div>');
                     logToRN('Marcador de usuario añadido');
                     
                     window.ReactNativeWebView.postMessage(JSON.stringify({

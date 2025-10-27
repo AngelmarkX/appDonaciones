@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
@@ -14,6 +14,7 @@ import authService from "../../services/authService"
 const EditProfileScreen = ({ navigation }) => {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [loadingProfile, setLoadingProfile] = useState(true)
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
@@ -21,22 +22,52 @@ const EditProfileScreen = ({ navigation }) => {
     address: user?.address || "",
   })
 
-  const handleSave = async () => {
-    if (!formData.name.trim() || !formData.email.trim()) {
-      Alert.alert("Error", "El nombre y email son obligatorios")
-      return
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        console.log("[v0] Fetching complete profile data...")
+        const response = await fetch(`https://backend-production-b28f.up.railway.app/api/users/profile`, {
+          method: "GET",
+          headers: authService.getAuthHeaders(),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log("[v0] Profile data fetched:", data)
+
+          if (data.user) {
+            setFormData({
+              name: data.user.name || "",
+              email: data.user.email || "",
+              phone: data.user.phone || "",
+              address: data.user.address || "",
+            })
+          }
+        } else {
+          console.log("[v0] Failed to fetch profile, using context data")
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching profile:", error)
+      } finally {
+        setLoadingProfile(false)
+      }
     }
 
+    fetchProfileData()
+  }, [])
+
+  const handleSave = async () => {
     setLoading(true)
     try {
-      console.log("🔄 [EDIT_PROFILE] Actualizando perfil:", formData)
+      console.log("🔄 [EDIT_PROFILE] Actualizando perfil:", {
+        phone: formData.phone,
+        address: formData.address,
+      })
 
-      const response = await fetch(`http://192.168.1.5:3006/api/users/profile`, {
+      const response = await fetch(`https://backend-production-b28f.up.railway.app/api/users/profile`, {
         method: "PUT",
         headers: authService.getAuthHeaders(),
         body: JSON.stringify({
-          name: formData.name.trim(),
-          email: formData.email.trim(),
           phone: formData.phone.trim(),
           address: formData.address.trim(),
         }),
@@ -57,6 +88,16 @@ const EditProfileScreen = ({ navigation }) => {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (loadingProfile) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+          <Text>Cargando perfil...</Text>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   return (
@@ -83,20 +124,21 @@ const EditProfileScreen = ({ navigation }) => {
 
           <View style={styles.form}>
             <Input
-              label="Nombre *"
+              label="Nombre"
               value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
-              placeholder="Ingresa tu nombre"
+              placeholder="Nombre"
               leftIcon="person-outline"
+              editable={false}
+              style={styles.disabledInput}
             />
 
             <Input
-              label="Email *"
+              label="Email"
               value={formData.email}
-              onChangeText={(text) => setFormData({ ...formData, email: text })}
               placeholder="tu@email.com"
               leftIcon="mail-outline"
-              keyboardType="email-address"
+              editable={false}
+              style={styles.disabledInput}
             />
 
             <Input
@@ -194,6 +236,10 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     padding: spacing.lg,
+  },
+  disabledInput: {
+    backgroundColor: colors.backgroundSecondary,
+    opacity: 0.6,
   },
 })
 
